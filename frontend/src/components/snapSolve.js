@@ -2,6 +2,7 @@
 import { captureMemeSnapshot, resetAutoScan, setOnHandTracking } from "./memeDetector.js";
 import { readProgress, writeProgress, syncProgress } from "./gameProgress.js";
 import { icon as ic, POSE_SVG, LOCK_SVG, launchCelebration } from "./handlabIcons.js";
+import { OneEuro } from "./handMath.js";
 let stopCelebration = null;
 
 function sleep(ms) {
@@ -599,8 +600,11 @@ export function startPuzzleGame(imageSrc, levelId) {
     const GRAB_FRAMES   = 2;      // cần 2 frame liên tiếp là "fist" mới gắp
     const DROP_FRAMES   = 3;      // cần 3 frame liên tiếp KHÔNG phải fist mới thả
     const LOST_FRAMES   = 12;     // mất tay quá 12 frame mới hủy thao tác
-    const SMOOTH        = 0.35;   // 0..1, càng lớn con trỏ càng bám sát (càng nhạy, càng rung)
+    //const SMOOTH        = 0.35;   // 0..1, càng lớn con trỏ càng bám sát (càng nhạy, càng rung)
     const GESTURE_CONFIRM_FRAMES = 3;   // cử chỉ phải giữ 3 frame mới được coi là "ổn định" (chống nhiễu)
+    const SMOOTH        = 0.6;    // hệ số bám của con trỏ ở 60fps (đã có bộ lọc ở trên nên có thể tăng)
+    const filterX = new OneEuro();
+    const filterY = new OneEuro();
 
     // ---- Xoay bằng cổ tay (level Twist & Lock) ----
     const TILT_ON       = 30;     // nghiêng quá 30° so với lúc gắp => xoay 1 nấc 90°
@@ -1077,8 +1081,10 @@ export function startPuzzleGame(imageSrc, levelId) {
             cursor.style.display = "flex";
         }
 
-        targetX = L.bx + remap(x, HAND_MARGIN_X) * L.bw;
-        targetY = L.by + remap(y, HAND_MARGIN_Y) * L.bh;
+        const nowS = performance.now() / 1000;
+        if (justAppeared) { filterX.reset(); filterY.reset(); }
+        targetX = filterX.filter(L.bx + remap(x, HAND_MARGIN_X) * L.bw, nowS);
+        targetY = filterY.filter(L.by + remap(y, HAND_MARGIN_Y) * L.bh, nowS);
         if (justAppeared) { curX = targetX; curY = targetY; justAppeared = false; }
 
         // làm mượt góc cổ tay

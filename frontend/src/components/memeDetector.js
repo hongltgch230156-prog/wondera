@@ -26,6 +26,7 @@ const GESTURE_MODEL_URL =
 const FACE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
+let drawTick = 0;
 let gestureRecognizer = null;
 let faceLandmarker = null;
 let videoElement = null;
@@ -73,50 +74,45 @@ const STABLE_DURATION = 700;
 /**
  * Khởi tạo MediaPipe
  */
-async function initializeMediaPipe() {
-  if (gestureRecognizer && faceLandmarker) return;
-  const vision = await FilesetResolver.forVisionTasks(
-    VISION_WASM_URL
-  );
+let visionFileset = null;
 
-  const createGestureRecognizer = (delegate) =>
-    GestureRecognizer.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: GESTURE_MODEL_URL,
-        delegate, // "GPU" nhanh hơn rất nhiều so với "CPU"
-      },
-      runningMode: "VIDEO",
-      numHands: 2,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
+async function initializeMediaPipe(needFace = true) {
+  if (!visionFileset) visionFileset = await FilesetResolver.forVisionTasks(VISION_WASM_URL);
+  const vision = visionFileset;
 
-  try {
-    gestureRecognizer = await createGestureRecognizer("GPU");
-  } catch (e) {
-    console.warn("[Hand Lab] GPU delegate failed, falling back to CPU:", e);
-    gestureRecognizer = await createGestureRecognizer("CPU");
+  if (!gestureRecognizer) {
+    const createGestureRecognizer = (delegate) =>
+      GestureRecognizer.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: GESTURE_MODEL_URL, delegate },
+        runningMode: "VIDEO",
+        numHands: 2,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+    let usedDelegate = "GPU";
+    try {
+      gestureRecognizer = await createGestureRecognizer("GPU");
+    } catch (e) {
+      usedDelegate = "CPU";
+      console.warn("[Hand Lab] GPU delegate failed, falling back to CPU:", e);
+      gestureRecognizer = await createGestureRecognizer("CPU");
+    }
+    console.log("[Hand Lab] gesture delegate:", usedDelegate);
   }
 
-  faceLandmarker = await FaceLandmarker.createFromOptions(
-    vision,
-    {
-      baseOptions: {
-        modelAssetPath: FACE_MODEL_URL,
-      },
+  if (needFace && !faceLandmarker) {
+    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: FACE_MODEL_URL },
       runningMode: "VIDEO",
       numFaces: 1,
       minFaceDetectionConfidence: 0.5,
       minFacePresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
-
       outputFaceBlendshapes: true,
       outputFacialTransformationMatrixes: false,
-    }
-  );
-
-  console.log("[Meme Search] MediaPipe initialized.");
+    });
+  }
 }
 
 /**
@@ -189,7 +185,9 @@ function normalizeGesture(rawGesture) {
  */
 function detectGesture(timestamp) {
   if (!gestureRecognizer || !videoElement) return;
+  const tRec = performance.now();
   const result = gestureRecognizer.recognizeForVideo(videoElement, timestamp);
+  window.__recMs = performance.now() - tRec;     // xem trong console: __recMs
 
   // 1. Đọc gesture cơ bản
   if (result.gestures && result.gestures.length > 0 && result.gestures[0].length > 0) {
@@ -201,9 +199,10 @@ function detectGesture(timestamp) {
     if (result.landmarks && result.landmarks.length > 0) {
     const hand = result.landmarks[0];
     const pointer = hand[9]; 
+    const palm = { x: (hand[0].x + hand[9].x) / 2, y: (hand[0].y + hand[9].y) / 2 };
     
     // --- Vẽ Khung Xương (Landmarks) lên Mini Canvas ---
-    if (activeTabId === "snap-solve") {
+    if (activeTabId === "snap-solve" && (drawTick++ & 1) === 0) {
       if (!miniCanvas || !miniCanvas.isConnected) {
         miniCanvas = document.getElementById("hl-canvas-mini");
         miniCtx = null;
@@ -242,7 +241,7 @@ function detectGesture(timestamp) {
         // 0° = tay thẳng đứng, + = nghiêng sang PHẢI trên màn hình (đã tính lật gương).
         const wrist = hand[0];
         const roll = Math.atan2(-(pointer.x - wrist.x), -(pointer.y - wrist.y)) * 180 / Math.PI;
-        onHandTrackingCallback(1 - pointer.x, pointer.y, currentGesture, roll, currentGestureScore);
+        onHandTrackingCallback(1 - palm.x, palm.y, currentGesture, roll, currentGestureScore);
     }
   } else {
     currentGesture = "None";
@@ -567,7 +566,7 @@ export async function startDetector(tabId = "meme-search") {
   if (!videoElement) return;
 
   try {
-    await initializeMediaPipe();
+    await initializeMediaPipe(tabId === "meme-search");
     if (myToken !== startToken) return;          // đã bị stop trong lúc tải model
     await startCamera();
     if (myToken !== startToken) { stopCamera(); return; } // đã bị stop trong lúc xin camera

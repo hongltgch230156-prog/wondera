@@ -322,6 +322,7 @@ document.querySelectorAll(".modal-exit-button").forEach((button) => {
 });
 
 let isModalOpen = true;
+let pauseSceneRender = false;
 
 const showModal = (modal) => {
   modal.style.display = "block";
@@ -361,9 +362,17 @@ const showModal = (modal) => {
     duration: 0.5,
     ease: "back.out(2)",
   });
+
+  if (modal.classList.contains("hand-lab-modal")) {
+    setTimeout(() => {
+      if (isModalOpen) pauseSceneRender = true;
+    }, 700);
+  }
 };
 
+
 const hideModal = (modal) => {
+  pauseSceneRender = false;
   isModalOpen = false;
   controls.enabled = true;
   gsap.to(overlay, { opacity: 0, duration: 0.5 });
@@ -2530,9 +2539,9 @@ const updateClockHands = () => {
 
 const render = (timestamp) => {
 
+  if (pauseSceneRender) { window.requestAnimationFrame(render); return; }
   const elapsedTime = clock.getElapsedTime();
-
-  const deltaTime = elapsedTime - previousTime;
+  const deltaTime = Math.min(elapsedTime - previousTime, 0.1);
   previousTime = elapsedTime;
   // Cập nhật animation của Mascot
   if (chatbotMascot) {
