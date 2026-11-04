@@ -12,6 +12,7 @@ const mongoose = require('mongoose');
 const Creation = require('../models/Creation');
 const User = require('../models/User');
 const storage = require('../utils/storage');
+const { healPendingTasks } = require('../utils/modelTasks');
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ for (const [segment, type] of Object.entries(SEGMENTS)) {
           await storage.removeFiles(s.thumb);
           await s.deleteOne();
         }
+        try { await healPendingTasks(req.user._id); } catch (e) { console.warn('[account/heal]', e.message); }
       }
       const items = await Creation.find({ user: req.user._id, type, status: 'ready' })
         .sort({ createdAt: -1 })

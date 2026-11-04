@@ -1,5 +1,5 @@
 // frontend/src/components/handlab.js
-import { initSnapSolve, startPuzzleCaptureFlow } from "./snapSolve.js";
+import { initSnapSolve, startPuzzleCaptureFlow, stopSnapSolve } from "./snapSolve.js";
 import {
     startDetector,
     stopDetector,
@@ -8,6 +8,8 @@ import {
     setOnHandTracking,
     resetAutoScan
 } from "./memeDetector.js";
+
+import { startPuppetStage, stopPuppetStage } from "./puppet/puppetStage.js";
 
 // =====================================================================
 // CẤU HÌNH KẾT QUẢ TÌM KIẾM (GIF / MEME)
@@ -18,6 +20,7 @@ const RESULTS_PER_TAB = 45;
 const GIPHY_PAGE_SIZE = 50;        // Giphy trả tối đa 50 kết quả cho mỗi lần gọi => tự gọi thêm trang khi cần
 const RERANK_BATCH_SIZE = 20;      // mỗi lần nhờ Gemini chấm điểm tối đa 20 ảnh (chia lô chạy song song)
 const SEARCH_QUERY_MAX_LENGTH = 80;
+const DEFAULT_TAB = "puppet-stage";   // muốn quay lại Meme Search làm mặc định: đổi thành "meme-search"
 
 // Mỗi tab có tới ~45 ảnh nên ưu tiên bản ảnh nhỏ (rộng 200px) cho nhẹ và tải nhanh.
 // Muốn ảnh nét hơn (nhưng nặng hơn): đổi "fixed_width" thành "downsized" ở đầu mảng.
@@ -31,6 +34,10 @@ const MEME_GRID = "#hl-memes-panel .hl-meme-grid";
 // Kết quả của lần tìm cũ về trễ sẽ bị bỏ, và request cũ bị huỷ => không bao giờ ghi đè kết quả mới.
 let searchToken = 0;
 let searchController = null;
+
+let memeFlowToken = 0;        // hủy đếm ngược chụp của Meme Search khi rời tab
+let handLabReady = false;     // initHandLab chỉ được chạy 1 lần (tránh đăng ký listener lặp)
+let handLabSwitchTab = null;  // lấy switchTab từ bên trong initHandLab ra ngoài
 
 export function initHandLab() {
   const tabButtons =
@@ -112,18 +119,29 @@ export function initHandLab() {
         index > targetIndex
       );
     });
-    // Meme Search vừa được mở
-    stopDetector(); // Dừng camera cũ
-    if (targetTabId === "meme-search") {
-      setOnHandTracking(null); // Reset lại cấu hình nhận diện 2 tay
+    // Rời tab Puppet Stage thì tắt camera + vòng lặp riêng của nó
+    if (targetTabId !== "puppet-stage") stopPuppetStage();
+    stopDetector(); // Dừng camera cũ của Meme Search / Snap & Solve
+    if (targetTabId === "puppet-stage") {
+      stopSnapSolve();
+      cancelMemeCountdown();
+      setOnHandTracking(null);
+      await startPuppetStage();   // dùng camera + MediaPipe riêng (không qua memeDetector)
+    } else if (targetTabId === "meme-search") {
+      stopSnapSolve();
+      setOnHandTracking(null);
       await startDetector("meme-search");
       resetAutoScan();
     } else if (targetTabId === "snap-solve") {
+      cancelMemeCountdown();
       await startDetector("snap-solve");
       resetAutoScan();
       initSnapSolve();
     }
   };
+
+  handLabSwitchTab = switchTab;
+
   tabButtons.forEach((button) => {
     button.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -199,12 +217,68 @@ export function initHandLab() {
     startDetector("meme-search");
     resetAutoScan();
   }
+
+  const puppetTab = document.getElementById("tab-puppet-stage");
+  if (puppetTab && puppetTab.classList.contains("is-active")) {
+    startPuppetStage();
+  }
 }
 function sleep(ms) {
     return new Promise((resolve) => {
         setTimeout(resolve, ms);
     });
 }
+
+// Hủy đếm ngược chụp của Meme Search (không đụng tới kết quả đã có)
+function cancelMemeCountdown() {
+  memeFlowToken++;
+  const ui = getMemeCaptureUI();
+  const counting = ui.countdown?.classList.contains("is-visible");
+  if (ui.countdown) { ui.countdown.textContent = ""; ui.countdown.classList.remove("is-visible"); }
+  if (counting && ui.captureButton) ui.captureButton.disabled = false;
+}
+
+// Đưa Meme Search về trạng thái ban đầu (dùng khi đóng Hand Lab)
+function resetMemeSearch() {
+  cancelMemeCountdown();
+  cancelActiveSearch();
+  clearResults();
+  const ui = getMemeCaptureUI();
+  if (ui.memeGrid) ui.memeGrid.innerHTML = "";
+  const panel = getResultsPanel();
+  if (panel) panel.style.display = "none";
+  const scanOverlay = document.querySelector("#tab-meme-search .hl-scan-overlay");
+  if (scanOverlay) scanOverlay.style.display = "flex";
+  if (ui.snapshotImage) {
+    ui.snapshotImage.classList.remove("is-visible");
+    ui.snapshotImage.removeAttribute("src");        // xóa luôn ảnh chụp mặt khỏi trang
+  }
+  if (ui.captureButton) ui.captureButton.disabled = false;
+  if (ui.helperText) ui.helperText.textContent = "Use 2 hands to frame your face";
+  const input = document.getElementById("hl-search-input");
+  if (input) { input.value = ""; input.dispatchEvent(new Event("input")); }
+  document.querySelector('.hl-result-tab[data-result-tab="gifs"]')?.click(); // về tab GIFs
+}
+
+/** Gọi khi MỞ Hand Lab (thay cho initHandLab() trong main.js) */
+export function openHandLab() {
+  if (!handLabReady) {
+    handLabReady = true;
+    initHandLab();                 // lần đầu: đăng ký listener và bật camera
+  } else {
+    handLabSwitchTab?.(DEFAULT_TAB);
+  }
+}
+
+/** Gọi khi ĐÓNG Hand Lab (nút X / click overlay): dừng mọi thứ và reset */
+export function closeHandLab() {
+  stopPuppetStage();
+  stopSnapSolve();
+  resetMemeSearch();
+  setOnHandTracking(null);
+  stopDetector();                  // tắt camera + vòng nhận diện
+}
+
 function getMemeCaptureUI() {
     return {
         video: document.getElementById(
@@ -244,6 +318,8 @@ async function startMemeCaptureFlow() {
         );
         return;
     }
+
+    const myFlow = ++memeFlowToken;
     // Không cho bấm nhiều lần trong lúc countdown
     if (ui.captureButton) {
         ui.captureButton.disabled = true;
@@ -278,14 +354,17 @@ async function startMemeCaptureFlow() {
         );
     }
     await sleep(1000);
+    if (myFlow !== memeFlowToken) return;
     if (ui.countdown) {
         ui.countdown.textContent = "2";
     }
     await sleep(1000);
+    if (myFlow !== memeFlowToken) return;
     if (ui.countdown) {
         ui.countdown.textContent = "1";
     }
     await sleep(1000);
+    if (myFlow !== memeFlowToken) return;
     // ==========================================
     // CAPTURE ĐÚNG KHOẢNH KHẮC NÀY
     // ==========================================
@@ -930,3 +1009,15 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+
+
+
+
+
+
+
+
+
+
+

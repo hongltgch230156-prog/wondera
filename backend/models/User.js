@@ -16,6 +16,8 @@ const userSchema = new mongoose.Schema(
     avatar: { type: String, default: '' },
     // Có giá trị khi tài khoản được tạo/liên kết bằng Google
     googleId: { type: String, unique: true, sparse: true },
+    // Số credits còn lại. KHÔNG đặt default: ví được khởi tạo + tặng credits miễn phí khi dùng lần đầu (utils/credits.js)
+    credits: { type: Number, min: 0 },
     // Tiến độ Snap & Solve của riêng tài khoản này
     snapSolve: {
       completed: { type: [Number], default: [] },

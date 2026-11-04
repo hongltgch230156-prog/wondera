@@ -100,33 +100,64 @@ export function initSnapSolve() {
     console.log("[Snap & Solve] Initialized.");
 }
 
+let captureToken = 0; // tăng khi rời tab để hủy đếm ngược 3-2-1 đang dở
+
 export async function startPuzzleCaptureFlow() {
-    const video = document.getElementById("hl-webcam-puzzle");
-    const countdown = document.querySelector("#tab-snap-solve .hl-countdown-number");
-    const helperText = document.querySelector("#tab-snap-solve .hl-helper-text");
-    if (!video || video.paused) return;
-    if (helperText) helperText.textContent = "Hold steady!";
-    if (countdown) {
-        countdown.textContent = "3";
-        countdown.classList.add("is-visible");
-    }
-    await sleep(1000);
-    if (countdown) countdown.textContent = "2";
-    await sleep(1000);
-    if (countdown) countdown.textContent = "1";
-    await sleep(1000);
-    const snapshot = captureMemeSnapshot();
-    if (countdown) {
-        countdown.textContent = "";
-        countdown.classList.remove("is-visible");
-    }
-    if (snapshot && snapshot.frame) {
-        const scanOverlay = document.querySelector("#tab-snap-solve .hl-scan-overlay");
-        if(scanOverlay) scanOverlay.style.display = 'none';
-        startPuzzleGame(snapshot.frame);
-    } else {
-        if (helperText) helperText.textContent = "Failed to capture. Try again.";
-    }
+    const my = ++captureToken;
+    const aborted = () => my !== captureToken;
+    const video = document.getElementById("hl-webcam-puzzle");
+    const countdown = document.querySelector("#tab-snap-solve .hl-countdown-number");
+    const helperText = document.querySelector("#tab-snap-solve .hl-helper-text");
+    if (!video || video.paused) return;
+    if (helperText) helperText.textContent = "Hold steady!";
+    if (countdown) {
+        countdown.textContent = "3";
+        countdown.classList.add("is-visible");
+    }
+    await sleep(1000);
+    if (aborted()) return;
+    if (countdown) countdown.textContent = "2";
+    await sleep(1000);
+    if (aborted()) return;
+    if (countdown) countdown.textContent = "1";
+    await sleep(1000);
+    if (aborted()) return;
+    const snapshot = captureMemeSnapshot();
+    if (countdown) {
+        countdown.textContent = "";
+        countdown.classList.remove("is-visible");
+    }
+    if (snapshot && snapshot.frame) {
+        const scanOverlay = document.querySelector("#tab-snap-solve .hl-scan-overlay");
+        if (scanOverlay) scanOverlay.style.display = 'none';
+        startPuzzleGame(snapshot.frame);
+    } else {
+        if (helperText) helperText.textContent = "Failed to capture. Try again.";
+    }
+}
+
+/** Rời tab Snap & Solve / đóng Hand Lab: dừng game, dừng đếm ngược, đưa về màn chụp ảnh. */
+export function stopSnapSolve() {
+    captureToken++;                                   // hủy đếm ngược đang dở
+    if (stopPrevGame) stopPrevGame();                 // cleanup() của game: dừng rAF, pháo hoa, overlay...
+    if (window.__chipObs) { window.__chipObs.disconnect(); window.__chipObs = null; }
+    const mini = document.getElementById("hl-webcam-mini");
+    if (mini) mini.srcObject = null;
+
+    const snapView = document.getElementById("hl-snap-view");
+    const levelView = document.getElementById("hl-level-view");
+    const nextBtn = document.getElementById("btn-next-level");
+    const scanOverlay = document.querySelector("#tab-snap-solve .hl-scan-overlay");
+    const countdown = document.querySelector("#tab-snap-solve .hl-countdown-number");
+    const helperText = document.querySelector("#tab-snap-solve .hl-helper-text");
+    if (snapView) snapView.style.display = "flex";
+    if (levelView) levelView.style.display = "none";
+    if (nextBtn) nextBtn.style.display = "none";
+    if (scanOverlay) scanOverlay.style.display = "flex";
+    if (countdown) { countdown.textContent = ""; countdown.classList.remove("is-visible"); }
+    if (helperText) helperText.classList.remove("is-win");
+    setHint("Use 2 hands to frame your face. Expand to capture.");
+    resetAutoScan();
 }
 
 // =========================================================

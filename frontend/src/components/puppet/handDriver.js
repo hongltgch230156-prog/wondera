@@ -1,0 +1,243 @@
+// frontend/src/components/puppet/handDriver.js
+// ĐỌC BÀN TAY -> dữ liệu điều khiển con rối.
+//  - Chế độ "camera": MediaPipe HandLandmarker (nạp từ CDN, độc lập với memeDetector.js).
+//  - Chế độ "sim"   : giả lập bằng chuột/bàn phím khi không có webcam (và để test).
+// Mỗi khung hình sinh ra một "mẫu" (sample) đã lọc nhiễu: vị trí lòng bàn tay, vector từng ngón, góc nghiêng, cú vung.
+import { FINGERS, TRACKING } from "./puppetConfig.js";
+
+const PALM_IDX = [0, 5, 9, 13, 17];
+export const SKELETON = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [9, 10], [10, 11], [11, 12], [5, 9], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]];
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+export class HandDriver {
+  /**
+   * opts: { video, overlay, onStatus(text, level) }
+   *  video/overlay: <video> và <canvas> của khung "HAND TRACKING AREA" (được lật gương bằng CSS)
+   */
+  constructor(opts = {}) {
+    this.video = opts.video || null;
+    this.overlay = opts.overlay || null;
+    this.onStatus = opts.onStatus || (() => {});
+    this.mode = "off";                // "off" | "camera" | "sim"
+    this.landmarker = null;
+    this.stream = null;
+    this.raf = 0;
+    this.lastVideoTime = -1;
+    this.running = false;
+
+    // ---- trạng thái hiện tại ----
+    this.present = false;
+    this.lastSeen = 0;
+    this.lm = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5 })); // đã lọc, ĐÃ lật gương (x' = 1 - x)
+    this.raw = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5 })); // chưa lật gương – để vẽ lên overlay
+    this.palm = { x: 0.5, y: 0.5 };
+    this.hs = 0.12;                    // kích thước bàn tay (cổ tay -> khớp ngón giữa)
+    this.vec = {};                     // vector từng ngón so với lòng bàn tay, chuẩn hoá theo hs
+    for (const f of Object.keys(FINGERS)) this.vec[f] = { x: 0, y: -2 };
+    this.roll = 0;                     // nghiêng bàn tay (rad), 0 = thẳng đứng
+    this._swing = null;
+    this._swingCooldown = 0;
+    this._prevRing = null;
+    this._vRing = { x: 0, y: 0 };
+    this._sim = { x: 0.35, y: 0.55, hs: 0.14, t: 0, keys: new Set(), last: 0, vx: 0, vy: 0, tx: 0.35, ty: 0.55 };
+    this._bind = null;
+  }
+
+  /* ---------------------------------------------------------------- */
+  async start() {
+    if (this.running) return this.mode;
+    this.running = true;
+    this.onStatus("Starting camera…", "info");
+    try {
+      await this._startCamera();
+      await this._loadLandmarker();
+      this.mode = "camera";
+      this.onStatus("Show your hand to the camera", "ok");
+    } catch (err) {
+      console.warn("[HandDriver] camera/MediaPipe unavailable, using mouse simulation:", err);
+      this._stopCamera();
+      this.startSim();
+      this.onStatus("No camera – move the mouse to control the puppet (Space = swing)", "warn");
+    }
+    this._loop();
+    return this.mode;
+  }
+
+  async _startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("getUserMedia not supported");
+    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+    if (!this.video) throw new Error("no <video> element");
+    this.video.srcObject = this.stream;
+    this.video.muted = true; this.video.playsInline = true;
+    await this.video.play();
+  }
+
+  async _loadLandmarker() {
+    // import() từ CDN: không cần cài thêm package. Nếu dự án đã có @mediapipe/tasks-vision, đổi dòng này thành: import("@mediapipe/tasks-vision")
+    const vision = await import(/* @vite-ignore */ TRACKING.MODULE_URL);
+    const fileset = await vision.FilesetResolver.forVisionTasks(TRACKING.WASM_URL);
+    const make = (delegate) => vision.HandLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: TRACKING.MODEL_URL, delegate },
+      runningMode: "VIDEO", numHands: 1,
+      minHandDetectionConfidence: TRACKING.MIN_CONFIDENCE, minHandPresenceConfidence: TRACKING.MIN_CONFIDENCE, minTrackingConfidence: TRACKING.MIN_CONFIDENCE,
+    });
+    try { this.landmarker = await make("GPU"); } catch { this.landmarker = await make("CPU"); }
+  }
+
+  _stopCamera() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    if (this.video) this.video.srcObject = null;
+  }
+
+  stop() {
+    this.running = false;
+    cancelAnimationFrame(this.raf);
+    this._stopCamera();
+    try { this.landmarker?.close(); } catch { /* bỏ qua */ }
+    this.landmarker = null;
+    this.stopSim();
+    this.mode = "off"; this.present = false;
+    this._clearOverlay();
+  }
+
+  /* ---------------------------------------------------------------- */
+  _loop = () => {
+    if (!this.running) return;
+    const now = performance.now();
+    if (this.mode === "camera" && this.landmarker && this.video?.readyState >= 2 && this.video.currentTime !== this.lastVideoTime) {
+      this.lastVideoTime = this.video.currentTime;
+      const res = this.landmarker.detectForVideo(this.video, now);
+      const pts = res?.landmarks?.[0];
+      if (pts) this._ingest(pts, now); else this._missing(now);
+    } else if (this.mode === "sim") {
+      this._ingest(this._simLandmarks(now), now, true);
+    }
+    this._drawOverlay();
+    this.raf = requestAnimationFrame(this._loop);
+  };
+
+  _missing(now) {
+    if (this.present && now - this.lastSeen > TRACKING.LOST_MS) { this.present = false; this._prevRing = null; }
+  }
+
+  /** pts: 21 điểm landmark chuẩn hoá (chưa lật gương) */
+  _ingest(pts, now, isSim = false) {
+    const a = this.present ? TRACKING.SMOOTH : 1;
+    for (let i = 0; i < 21; i++) {
+      this.raw[i].x = pts[i].x; this.raw[i].y = pts[i].y;
+      const mx = 1 - pts[i].x, my = pts[i].y;
+      this.lm[i].x += (mx - this.lm[i].x) * a;
+      this.lm[i].y += (my - this.lm[i].y) * a;
+    }
+    this.present = true; this.lastSeen = now;
+    let px = 0, py = 0;
+    for (const i of PALM_IDX) { px += this.lm[i].x; py += this.lm[i].y; }
+    this.palm.x = px / PALM_IDX.length; this.palm.y = py / PALM_IDX.length;
+    const hsRaw = Math.hypot(this.lm[0].x - this.lm[9].x, this.lm[0].y - this.lm[9].y);
+    this.hs += (Math.max(0.04, hsRaw) - this.hs) * 0.3;
+    for (const [name, f] of Object.entries(FINGERS)) {
+      const t = this.lm[f.tip];
+      this.vec[name].x = (t.x - this.palm.x) / this.hs;
+      this.vec[name].y = (t.y - this.palm.y) / this.hs;
+    }
+    this.roll = Math.atan2(this.lm[9].x - this.lm[0].x, -(this.lm[9].y - this.lm[0].y));
+    this._detectSwing(now, isSim);
+  }
+
+  /** Cú vung: đầu ngón áp út (tay trái của con rối, cầm vũ khí) đi nhanh sang PHẢI */
+  _detectSwing(now) {
+    const tip = this.lm[FINGERS.ring.tip];
+    if (this._prevRing) {
+      const dt = Math.max(0.001, (now - this._prevRing.t) / 1000);
+      const vx = (tip.x - this._prevRing.x) / dt / this.hs, vy = (tip.y - this._prevRing.y) / dt / this.hs;
+      this._vRing.x += (vx - this._vRing.x) * 0.6; this._vRing.y += (vy - this._vRing.y) * 0.6;
+      const speed = Math.hypot(this._vRing.x, this._vRing.y);
+      if (speed >= TRACKING.SWING_SPEED && this._vRing.x / speed >= TRACKING.SWING_MIN_DIR_X && now > this._swingCooldown) {
+        this._swing = { speed, dirX: this._vRing.x / speed, dirY: this._vRing.y / speed, t: now };
+        this._swingCooldown = now + TRACKING.SWING_COOLDOWN_MS;
+      }
+    }
+    this._prevRing = { x: tip.x, y: tip.y, t: now };
+  }
+  /** Lấy (và xoá) cú vung gần nhất, nếu có */
+  consumeSwing(maxAgeMs = 400) {
+    const s = this._swing; this._swing = null;
+    return s && performance.now() - s.t <= maxAgeMs ? s : null;
+  }
+  /** Chủ động phát một cú vung (phím Space ở chế độ sim, hoặc nút "Swing!" trên màn hình cảm ứng) */
+  forceSwing(dirY = 0) {
+    const now = performance.now();
+    this._swing = { speed: TRACKING.SWING_SPEED * 1.6, dirX: 0.95, dirY, t: now };
+    this._swingCooldown = now + TRACKING.SWING_COOLDOWN_MS;
+  }
+  get lostForMs() { return this.present ? 0 : performance.now() - this.lastSeen; }
+
+  /* ---------------------------------------------------------------- */
+  /*  Overlay: khung xương bàn tay trong ô webcam                      */
+  /* ---------------------------------------------------------------- */
+  _clearOverlay() {
+    const c = this.overlay; if (!c) return;
+    c.getContext("2d").clearRect(0, 0, c.width, c.height);
+  }
+  _drawOverlay() {
+    const c = this.overlay; if (!c) return;
+    const r = c.getBoundingClientRect();
+    if (c.width !== Math.round(r.width) || c.height !== Math.round(r.height)) { c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    const g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+    if (!this.present) return;
+    // video dùng object-fit: cover => đổi toạ độ chuẩn hoá của camera sang toạ độ khung
+    const vw = this.video?.videoWidth || 640, vh = this.video?.videoHeight || 480;
+    const k = Math.max(c.width / vw, c.height / vh), ox = (c.width - vw * k) / 2, oy = (c.height - vh * k) / 2;
+    const P = (p) => ({ x: ox + p.x * vw * k, y: oy + p.y * vh * k });
+    g.lineWidth = 2; g.strokeStyle = "#35e07a"; g.fillStyle = "#ff4d4d";
+    for (const [a, b] of SKELETON) { const A = P(this.raw[a]), B = P(this.raw[b]); g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.stroke(); }
+    for (const p of this.raw) { const q = P(p); g.beginPath(); g.arc(q.x, q.y, 2.6, 0, 6.283); g.fill(); }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Giả lập bằng chuột                                               */
+  /* ---------------------------------------------------------------- */
+  startSim(target = window) {
+    this.mode = "sim";
+    const s = this._sim;
+    const move = (e) => {
+      const el = this.simArea || document.body, r = el.getBoundingClientRect();
+      s.tx = clamp((e.clientX - r.left) / r.width, 0.05, 0.95); s.ty = clamp((e.clientY - r.top) / r.height, 0.1, 0.95);
+    };
+    const kd = (e) => { if (e.code === "Space") { e.preventDefault(); this.forceSwing(); } s.keys.add(e.code); };
+    const ku = (e) => s.keys.delete(e.code);
+    target.addEventListener("pointermove", move); target.addEventListener("keydown", kd); target.addEventListener("keyup", ku);
+    this._bind = () => { target.removeEventListener("pointermove", move); target.removeEventListener("keydown", kd); target.removeEventListener("keyup", ku); };
+  }
+  stopSim() { this._bind?.(); this._bind = null; }
+
+  /** Dựng 21 landmark giả quanh vị trí chuột (đã ở toạ độ CHƯA lật gương) */
+  _simLandmarks(now) {
+    const s = this._sim, dt = Math.min(0.05, (now - (s.last || now)) / 1000); s.last = now; s.t += dt;
+    s.x += (s.tx - s.x) * Math.min(1, dt * 14); s.y += (s.ty - s.y) * Math.min(1, dt * 14);
+    const hs = s.hs, wob = Math.sin(s.t * 3) * 0.06;
+    // vector đầu ngón (đơn vị bàn tay) – phím 1..5 gập từng ngón để thử chân/tay
+    const tipVec = {
+      thumb: { x: -1.1, y: -0.7 }, index: { x: -0.5, y: -2.3 + wob }, middle: { x: 0, y: -2.5 },
+      ring: { x: 0.5, y: -2.2 - wob }, pinky: { x: 1.0, y: -1.7 },
+    };
+    const keyMap = { Digit1: "thumb", Digit2: "index", Digit3: "middle", Digit4: "ring", Digit5: "pinky" };
+    for (const [k, f] of Object.entries(keyMap)) if (s.keys.has(k)) tipVec[f] = { x: tipVec[f].x * 0.35, y: -0.5 };
+    // toạ độ chưa lật gương = 1 - mirrored
+    const pm = { x: 1 - s.x, y: s.y };
+    const pts = new Array(21);
+    const at = (dx, dy) => ({ x: pm.x - dx * hs, y: pm.y + dy * hs });   // dx tính theo ảnh đã lật => trừ
+    pts[0] = at(0, 1.0);
+    const mcp = { 1: [-0.6, 0.55], 5: [-0.55, -0.1], 9: [-0.05, -0.2], 13: [0.45, -0.1], 17: [0.85, 0.1] };
+    for (const [i, [x, y]] of Object.entries(mcp)) pts[i] = at(x, y);
+    for (const [name, f] of Object.entries(FINGERS)) {
+      const base = pts[f.base === 2 ? 1 : f.base], tipV = tipVec[name], tip = at(tipV.x, tipV.y);
+      const chain = name === "thumb" ? [2, 3, 4] : [f.base + 1, f.base + 2, f.base + 3];
+      if (name === "thumb") pts[1] = base;
+      chain.forEach((idx, n) => { const t = (n + 1) / chain.length; pts[idx] = { x: base.x + (tip.x - base.x) * t, y: base.y + (tip.y - base.y) * t }; });
+    }
+    return pts;
+  }
+}

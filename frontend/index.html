@@ -330,7 +330,7 @@
             </div>
 
             <div class="forge-magic-credits" aria-live="polite" aria-hidden="true">
-              <span class="forge-magic-credits-label">2/2 generations left</span>
+              <span class="forge-magic-credits-label">N credits left</span>
               <div
                 class="forge-magic-credits-track"
                 role="progressbar"
@@ -529,12 +529,30 @@
           <!-- Navigation Tabs -->
           <div class="hl-tabs-wrapper">
             <div class="hl-tabs">
-              <button class="hl-tab-btn is-active" data-tab="meme-search">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="hl-tab-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <!-- Tab Puppet Stage -->
+              <button class="hl-tab-btn is-active" data-tab="puppet-stage">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="hl-tab-icon">
+                  <circle cx="12" cy="5" r="2.5"/>
+                  <path d="M12 8v7M6 11h12M9 21l3-6 3 6"/>
+                </svg>
+                PUPPET STAGE
+              </button>
+
+              <!-- Tab Meme Search -->
+              <button class="hl-tab-btn" data-tab="meme-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="hl-tab-icon">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
                 MEME SEARCH
               </button>
+
+              <!-- Tab Snap & Solve -->
               <button class="hl-tab-btn" data-tab="snap-solve">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="hl-tab-icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="hl-tab-icon">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
                 SNAP & SOLVE
               </button>
             </div>
@@ -542,9 +560,86 @@
 
           <!-- Main Content Area -->
           <div class="hl-content-area">
+
+            <!-- ===================== TAB PUPPET STAGE =====================
+                Đặt TRƯỚC <div class="hl-tab-content" id="tab-meme-search">: thứ tự các .hl-tab-content phải KHỚP thứ tự các nút tab. -->
+            <div class="hl-tab-content is-active" id="tab-puppet-stage">
+              <div class="ps-layout">
+                <aside class="ps-side">
+                  <!-- Webcam -->
+                  <section class="ps-card ps-cam" aria-label="Hand tracking">
+                    <div class="ps-cam-view">
+                      <video id="ps-webcam" autoplay playsinline muted></video>
+                      <canvas id="ps-cam-overlay"></canvas>
+                      <i class="ps-corner ps-corner--tl"></i><i class="ps-corner ps-corner--tr"></i><i class="ps-corner ps-corner--bl"></i><i class="ps-corner ps-corner--br"></i>
+                    </div>
+                    <div class="ps-cam-foot">
+                      <span>HAND TRACKING AREA</span>
+                      <span class="ps-live" id="ps-live" data-state="off"><i></i><b>OFF</b></span>
+                    </div>
+                  </section>
+                  <!-- Con rối -->
+                  <section class="ps-card ps-sel" id="ps-sel-puppet" aria-label="Puppet character">
+                    <header class="ps-sel-head"><span>PUPPET CHARACTER</span><b id="ps-puppet-name"></b></header>
+                    <div class="ps-strip">
+                      <button type="button" class="ps-arrow" data-dir="-1" aria-label="Previous">‹</button>
+                      <div class="ps-tiles" role="listbox" aria-label="Puppet characters"></div>
+                      <button type="button" class="ps-arrow" data-dir="1" aria-label="Next">›</button>
+                    </div>
+                  </section>
+                  <!-- Trang bị: LEFT = tay trái (ngón áp út) cầm vũ khí, RIGHT = tay phải (ngón trỏ) cầm vợt -->
+                  <section class="ps-card ps-sel" id="ps-sel-equip" aria-label="Equipment">
+                    <header class="ps-sel-head">
+                      <span>EQUIPMENT</span>
+                      <div class="ps-seg" role="tablist" aria-label="Puppet hand">
+                        <button type="button" role="tab" class="is-active" data-hand="armL" title="Puppet's left hand · ring finger · weapon">LEFT</button>
+                        <button type="button" role="tab" data-hand="armR" title="Puppet's right hand · index finger · racket">RIGHT</button>
+                      </div>
+                    </header>
+                    <div class="ps-strip">
+                      <button type="button" class="ps-arrow" data-dir="-1" aria-label="Previous">‹</button>
+                      <div class="ps-tiles" role="listbox" aria-label="Equipment"></div>
+                      <button type="button" class="ps-arrow" data-dir="1" aria-label="Next">›</button>
+                    </div>
+                  </section>
+                  <!-- Quả cầu / vật phẩm -->
+                  <section class="ps-card ps-sel" id="ps-sel-ball" aria-label="Ball or item">
+                    <header class="ps-sel-head"><span>INTERACTIVE BALL / ITEM</span><b id="ps-ball-name"></b></header>
+                    <div class="ps-strip">
+                      <button type="button" class="ps-arrow" data-dir="-1" aria-label="Previous">‹</button>
+                      <div class="ps-tiles" role="listbox" aria-label="Ball or item"></div>
+                      <button type="button" class="ps-arrow" data-dir="1" aria-label="Next">›</button>
+                    </div>
+                  </section>
+                </aside>
+
+                <div class="ps-main">
+                  <div class="ps-stage" id="ps-stage">
+                    <canvas id="ps-canvas" aria-label="Puppet stage"></canvas>
+                    <div class="ps-hud" id="ps-hud" hidden>
+                      <div class="ps-hud-top">
+                        <div class="ps-lives" id="ps-lives" aria-label="Lives"></div>
+                        <div class="ps-score"><span>YOU</span><b id="ps-score-user">0</b><i>:</i><b id="ps-score-ai">0</b><span>AI</span></div>
+                        <div class="ps-energy"><span>POWER</span><div class="ps-energy-bar"><i id="ps-energy"></i></div></div>
+                      </div>
+                      <div class="ps-banner" id="ps-banner" aria-live="polite"></div>
+                      <div class="ps-guard" id="ps-guard" hidden><span data-g="0">▲ HIGH</span><span data-g="1">● MID</span><span data-g="2">▼ LOW</span></div>
+                    </div>
+                    <p class="ps-tip" id="ps-tip"></p>
+                    <div class="ps-overlay" id="ps-overlay">
+                      <div class="ps-ov-card">
+                        <h3 data-title>PUPPET STAGE</h3>
+                        <p data-text>Show your hand to the camera.</p>
+                        <button type="button" class="ps-btn ps-btn--primary" data-act="start">START</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             
             <!-- Tab 1: Meme Search -->
-            <div class="hl-tab-content is-active" id="tab-meme-search">
+            <div class="hl-tab-content" id="tab-meme-search">
               <div class="hl-camera-viewport hl-meme-viewport">
                 <!-- Khu vực hiển thị luồng Camera -->
                 <video

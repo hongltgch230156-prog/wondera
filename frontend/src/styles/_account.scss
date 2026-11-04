@@ -30,7 +30,8 @@
 }
 
 /* ---------- Bảng màu (CSS variables) ---------- */
-.account-root {
+.account-root,
+.bill-root {
   --acc-accent: #6e5e9c;
   --acc-accent-2: #8f7dd0;
   --acc-title: #6c3f7c;
@@ -46,7 +47,8 @@
   --acc-danger: #c0453f;
   --acc-ok: #3f9d6b;
 }
-.dark-theme .account-root {
+.dark-theme .account-root,
+.dark-theme .bill-root {
   --acc-accent: #b9a6ea;
   --acc-accent-2: #7b57b8;
   --acc-title: #e6dede;
@@ -461,6 +463,82 @@
   }
 }
 
+/* ---------- Credits (số dư + lịch sử + nút mua) ---------- */
+.account-credits {
+  padding: 14px 16px;
+  border: 1.5px solid var(--acc-line);
+  border-radius: 20px;
+  background: var(--acc-surface);
+}
+.account-credits-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.account-credits-balance {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--acc-line);
+  background: var(--acc-chip);
+  color: var(--acc-title);
+  strong { font-family: 'Baloo 2', sans-serif; font-size: 1.5rem; font-weight: 800; line-height: 1; }
+  span { font-size: 0.8rem; font-weight: 800; color: var(--acc-muted); }
+}
+.account-buy {
+  flex: none;
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--acc-accent-2), #6e5e9c);
+  box-shadow: 0 6px 14px rgba(110, 94, 156, 0.35);
+  &:hover { border-color: transparent; filter: brightness(1.08); }
+}
+.account-tx {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 4px;
+    border-top: 1px dashed var(--acc-line);
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .tx-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--acc-text); }
+  .tx-date { font-size: 0.8rem; color: var(--acc-muted); white-space: nowrap; }
+  .tx-delta {
+    min-width: 3ch;
+    text-align: right;
+    font-family: 'Baloo 2', sans-serif;
+    font-size: 1rem;
+    &.is-plus { color: var(--acc-ok); }
+    &.is-minus { color: var(--acc-danger); }
+  }
+}
+.account-tx-empty { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--acc-muted); }
+.account-tx-more {
+  margin-top: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--acc-accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+}
+
 /* ---------- Plan & Billing ---------- */
 .account-plan {
   display: flex;
@@ -623,6 +701,8 @@
   .account-avatar { width: 76px; height: 76px; }
   .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-plan { flex-wrap: wrap; }
+  .account-credits-head { flex-wrap: wrap; }
+  .account-credits-balance { margin-left: auto; }
   .account-levels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .account-game-head { flex-wrap: wrap; }
   .account-viewer { padding: 8px; }

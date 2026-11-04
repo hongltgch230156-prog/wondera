@@ -7,6 +7,8 @@ import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { FBXExporter } from '@comfyorg/fbx-exporter-three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { fetchWallet, onWalletChange, notifyOutOfCredits } from "./billing.js";
+import { API_BASE } from './auth.js';
 
 export function initForge() {
   const forgeModeButtons = document.querySelectorAll(".forge-mode-btn");
@@ -57,8 +59,9 @@ export function initForge() {
   };
   let previewVersion = 0;
   let isMagicWandExpanded = false;
-  const magicWandMaxCredits = 2;
-  let magicWandCredits = magicWandMaxCredits;
+  // Số credits do SERVER quản lý (xem billing.js). null = chưa tải xong ví.
+  const magicWandBarMax = 20; // thanh hiển thị đầy khi có từ 20 credits trở lên
+  let magicWandCredits = null;
   let isMagicWandActive = false;
   let isMagicWandPending = false;
   let isGenerationInProgress = false;
@@ -149,17 +152,28 @@ export function initForge() {
   };
 
   const updateMagicWandCredits = () => {
+    const known = magicWandCredits !== null;
     if (forgeMagicCreditsLabel) {
-      forgeMagicCreditsLabel.textContent = `${magicWandCredits}/${magicWandMaxCredits} generations left`;
+      forgeMagicCreditsLabel.textContent = known
+        ? `${magicWandCredits} credit${magicWandCredits === 1 ? "" : "s"} left`
+        : "Loading credits…";
     }
+    forgeMagicCredits?.classList.toggle("is-empty", known && magicWandCredits <= 0);
     if (forgeMagicCreditsTrack) {
-      forgeMagicCreditsTrack.setAttribute("aria-valuemax", String(magicWandMaxCredits));
-      forgeMagicCreditsTrack.setAttribute("aria-valuenow", String(magicWandCredits));
+      forgeMagicCreditsTrack.setAttribute("aria-valuemax", String(magicWandBarMax));
+      forgeMagicCreditsTrack.setAttribute("aria-valuenow", String(Math.min(magicWandCredits ?? 0, magicWandBarMax)));
     }
     if (forgeMagicCreditsFill) {
-      forgeMagicCreditsFill.style.transform = `scaleX(${magicWandCredits / magicWandMaxCredits})`;
+      // độ dài thanh theo % (bo tròn hai đầu đẹp hơn scaleX)
+      forgeMagicCreditsFill.style.transform = "none";
+      forgeMagicCreditsFill.style.width = `${Math.min((magicWandCredits ?? 0) / magicWandBarMax, 1) * 100}%`;
     }
   };
+  // Nhận số credits từ server (auth.js tải ví sau khi đăng nhập)
+  onWalletChange((wallet) => {
+    magicWandCredits = wallet.credits;
+    updateMagicWandCredits();
+  });
 
   const applyPlaceholderTransform = (rotationX, rotationY, scaleValue) => {
     if (!placeholderModel) return;
@@ -424,8 +438,9 @@ export function initForge() {
       showSourceRequiredDialog();
       return;
     }
-    if (magicWandCredits <= 0) {
-      alert("Bạn đã hết năng lượng Magic Wand! Vui lòng nâng cấp Pro.");
+
+    if (magicWandCredits !== null && magicWandCredits <= 0) {
+      notifyOutOfCredits();
       return;
     }
 
@@ -444,7 +459,7 @@ export function initForge() {
   });
 
   sourcePreviewImg?.addEventListener("click", (event) => {
-    if (!isMagicWandActive || isMagicWandPending || magicWandCredits <= 0 || !currentFileToUpload) return;
+    if (!isMagicWandActive || isMagicWandPending || (magicWandCredits !== null && magicWandCredits <= 0) || !currentFileToUpload) return;
     
     event.preventDefault();
     event.stopPropagation();
@@ -517,7 +532,7 @@ export function initForge() {
       formData.append("point_y", String(y));
       formData.append("selection_prompt", forgeSelectionPrompt?.value.trim() ?? "");
 
-      const response = await fetch("http://localhost:3000/api/magic-wand", {
+      const response = await fetch(`${API_BASE}/api/magic-wand`, {
         method: "POST",
         body: formData,
       });
@@ -548,19 +563,34 @@ export function initForge() {
       progressEstimator?.reset();
       isMagicWandPending = false;
       setGenerationBusy(false);
-      if (forgeMagicCreationBtnLabel) forgeMagicCreationBtnLabel.textContent = "3D Creation";
+      if (forgeMagicCreationBtnLabel) {
+        forgeMagicCreationBtnLabel.textContent = "3D Creation";
+      }
+      fetchWallet();
+      window.setTimeout(fetchWallet, 1500);
     };
 
     try {
       progressEstimator = createProgressEstimator(forgeMagicCreationBtn, "Generating 3D");
-      const taskRes = await fetch("http://localhost:3000/api/magic-wand/create", {
+      const taskRes = await fetch(`${API_BASE}/api/magic-wand/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_url: selectedIsolatedImageUrl }),
       });
       const taskData = await taskRes.json();
+      if (taskRes.status === 402) {
+        // Server báo hết credits -> mở hộp thoại mua credits
+        notifyOutOfCredits();
+        throw new Error("__out_of_credits__");
+      }
+
       if (!taskRes.ok || taskData.error || taskData.code !== 0) {
         throw new Error(taskData.error || "Tạo task Magic Wand thất bại");
+      }
+
+      if (typeof taskData.data?.credits === "number") {
+        magicWandCredits = taskData.data.credits; // hiện ngay số credits còn lại
+        updateMagicWandCredits();
       }
 
       const taskId = taskData.data?.task_id;
@@ -571,7 +601,7 @@ export function initForge() {
         if (isCheckingStatus) return;
         isCheckingStatus = true;
         try {
-          const statusRes = await fetch(`http://localhost:3000/api/task-status/${taskId}?mode=single`);
+          const statusRes = await fetch(`${API_BASE}/api/task-status/${taskId}?mode=single`);
           const statusData = await statusRes.json();
           if (!statusRes.ok || statusData.error) {
             throw new Error(statusData.error || "Không lấy được trạng thái task");
@@ -608,15 +638,17 @@ export function initForge() {
         }
       }, 3000);
     } catch (error) {
-      alert("Lỗi Magic Wand: " + error.message);
+      if (error.message !== "__out_of_credits__") alert("Lỗi Magic Wand: " + error.message);
       finishMagicWand();
     }
   };
 
   forgeMagicCreationBtn?.addEventListener("click", () => {
     if (!selectedMagicPoint || !selectedIsolatedImageUrl || isMagicWandPending || isGenerationInProgress) return;
-    if (magicWandCredits <= 0) {
-      alert("You have run out of Magic Wand energy! Please upgrade to Pro.");
+
+    // Credits do SERVER trừ (tải lại trang không có thêm lượt). Hết credits -> mở hộp thoại mua.
+    if (magicWandCredits !== null && magicWandCredits <= 0) {
+      notifyOutOfCredits();
       return;
     }
 
@@ -652,7 +684,7 @@ export function initForge() {
         formData.append("pose", poseFile);
       }
 
-      const taskRes = await fetch("http://localhost:3000/api/create-task", {
+      const taskRes = await fetch(`${API_BASE}/api/create-task`, {
         method: "POST",
         body: formData
       });
@@ -664,7 +696,7 @@ export function initForge() {
       const taskId = taskData.data.task_id;
       const checkInterval = setInterval(async () => {
         try {
-          const statusRes = await fetch(`http://localhost:3000/api/task-status/${taskId}?mode=${endpointMode}`);
+          const statusRes = await fetch(`${API_BASE}/api/task-status/${taskId}?mode=${endpointMode}`);
           const statusData = await statusRes.json();
           if (!statusRes.ok || statusData.error) {
             clearInterval(checkInterval);
@@ -1095,7 +1127,7 @@ export function initForge() {
       const formData = new FormData();
       formData.append("image", blob, kind === "ai-style" ? "style.jpg" : "render.png");
       formData.append("kind", kind);
-      const res = await fetch("http://localhost:3000/api/account/exports", { method: "POST", body: formData });
+      const res = await fetch(`${API_BASE}/api/account/exports`, { method: "POST", body: formData });
       if (!res.ok) console.warn("[Account] Could not save export:", res.status);
     } catch (error) {
       console.warn("[Account] Could not save export:", error);
@@ -1216,7 +1248,7 @@ export function initForge() {
         formData.append("source", currentFileToUpload, currentFileToUpload.name || "source-image");
         formData.append("render", renderBlob, "3d-forge-current-view.png");
 
-        const response = await fetch("/api/export-2d/reconstruct", {
+        const response = await fetch(`${API_BASE}/api/export-2d/reconstruct`, {
           method: "POST",
           body: formData,
         });
@@ -1248,6 +1280,41 @@ export function initForge() {
     option.addEventListener("click", () => export2D(option.dataset.exportMode));
   });
 
+  // Reset giao diện khi đóng modal. KHÔNG dừng vòng polling /api/task-status:
+  // server chỉ lưu model vào Account khi có người hỏi trạng thái, và các callback polling
+  // đã tự bỏ qua kết quả cũ nhờ so sánh sourceFile.
+  const resetForge = () => {
+    [modeStates.single, modeStates.multiple].forEach((s) => {
+      if (s.sourcePreviewUrl) URL.revokeObjectURL(s.sourcePreviewUrl);
+      if (s.posePreviewUrl) URL.revokeObjectURL(s.posePreviewUrl);
+    });
+    Object.assign(modeStates.single, {
+      sourceFile: null, sourcePreviewUrl: null,
+      poseFile: null, posePreviewUrl: null,
+      modelUrl: null,
+    });
+    Object.assign(modeStates.multiple, {
+      sourceFile: null, sourcePreviewUrl: null,
+      depthMapUrl: null, magicModelUrls: [],
+    });
+    currentFileToUpload = null;
+    currentPoseFile = null;
+    isMagicWandActive = false;
+    isMagicWandExpanded = false;
+    isMagicWandPending = false;
+    selectedMagicPoint = null;
+    selectedIsolatedImageUrl = null;
+    if (forgeSelectionPrompt) forgeSelectionPrompt.value = "";
+    if (sourceRequiredDialog?.open) sourceRequiredDialog.close();
+    setExportMenuOpen(false);
+    setExport2DMenuOpen(false);
+    clearThreeJSPreview();   // dừng vòng render Three.js, dọn viewer
+    setForgeMode("single");  // về tab Single, xóa preview ảnh, cập nhật nút
+    updateMagicWandState();
+  };
+
   // Khởi chạy trạng thái mặc định
   setForgeMode("single");
+
+  return { reset: resetForge };
 }

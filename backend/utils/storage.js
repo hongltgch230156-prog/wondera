@@ -1,28 +1,87 @@
 // backend/utils/storage.js
-// Lưu file (model .glb, ảnh export, thumbnail) lên ổ đĩa của server, trong backend/storage/.
+// Lưu file (model .glb, ảnh export, thumbnail).
+//  - Có SUPABASE_URL + SUPABASE_SERVICE_KEY trong .env  -> lưu lên Supabase Storage (vĩnh viễn, không mất khi deploy/restart)
+//  - Không có                                           -> lưu ổ đĩa server như cũ (tiện chạy localhost)
+// Các hàm export GIỮ NGUYÊN tên/kiểu trả về như bản cũ nên accountRoutes.js gần như không phải sửa.
+require('dotenv').config(); // storage.js được require TRƯỚC khi server.js gọi dotenv.config(), nên phải nạp .env ở đây
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const crypto = require('crypto');
+const express = require('express');
 const sharp = require('sharp');
 
-const STORAGE_DIR = path.join(__dirname, '..', 'storage');
-['models', 'exports', 'thumbs'].forEach((d) =>
-  fs.mkdirSync(path.join(STORAGE_DIR, d), { recursive: true })
-);
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const BUCKET = process.env.SUPABASE_BUCKET || 'wondera-files';
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
+const STORAGE_DIR = path.join(__dirname, '..', 'storage');
+if (!USE_SUPABASE) {
+  ['models', 'exports', 'thumbs'].forEach((d) =>
+    fs.mkdirSync(path.join(STORAGE_DIR, d), { recursive: true })
+  );
+}
+console.log(`[storage] Đang lưu file bằng: ${USE_SUPABASE ? `Supabase Storage (bucket "${BUCKET}")` : 'Ổ ĐĨA SERVER (có thể mất khi deploy!)'}`);
+
+/* ----------------------------- Supabase client ----------------------------- */
+let _client = null;
+function client() {
+  if (!_client) {
+    const { createClient } = require('@supabase/supabase-js');
+    _client = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return _client;
+}
+
+// Gói Free của Supabase có thể tự "tạm dừng" project nếu lâu không có hoạt động.
+// Gọi nhẹ 1 lần / 12 giờ (khi server đang chạy) để project luôn được tính là còn hoạt động.
+if (USE_SUPABASE) {
+  const t = setInterval(() => {
+    client().storage.from(BUCKET).list('', { limit: 1 }).catch(() => {});
+  }, 12 * 60 * 60 * 1000);
+  if (t.unref) t.unref();
+}
+
+/* ----------------------------- Tiện ích chung ----------------------------- */
 // Tên file ngẫu nhiên 32 ký tự hex => không đoán được link của người khác
 const randomName = () => crypto.randomBytes(16).toString('hex');
 
-// Chặn đường dẫn thoát ra ngoài thư mục storage
+const CONTENT_TYPES = {
+  '.glb': 'model/gltf-binary',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+};
+
+// Chặn đường dẫn thoát ra ngoài thư mục storage (chế độ ổ đĩa)
 function resolveSafe(rel) {
   const abs = path.resolve(STORAGE_DIR, rel);
   if (!abs.startsWith(STORAGE_DIR + path.sep)) throw new Error('Đường dẫn không hợp lệ');
   return abs;
 }
 
+// URL công khai trực tiếp của Supabase cho một "rel" kiểu "models/abc.glb"
+const supabasePublicUrl = (rel) => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${rel}`;
+
+/* ----------------------------- Ghi / xóa / kiểm tra ----------------------------- */
+/** Lưu buffer, trả về "rel" (vd "models/abc.glb") để lưu vào database như trước. */
 async function saveBuffer(subdir, ext, buffer) {
   const rel = `${subdir}/${randomName()}${ext}`;
+  if (USE_SUPABASE) {
+    const { error } = await client()
+      .storage.from(BUCKET)
+      .upload(rel, buffer, {
+        contentType: CONTENT_TYPES[ext] || 'application/octet-stream',
+        cacheControl: '31536000',
+        upsert: false,
+      });
+    if (error) throw new Error(`Supabase upload lỗi: ${error.message}`);
+    return rel;
+  }
   await fsp.writeFile(resolveSafe(rel), buffer);
   return rel;
 }
@@ -39,8 +98,17 @@ async function saveThumb(buffer) {
 }
 
 async function removeFiles(...rels) {
-  for (const rel of rels) {
-    if (!rel) continue;
+  const list = rels.filter(Boolean);
+  if (!list.length) return;
+  if (USE_SUPABASE) {
+    try {
+      await client().storage.from(BUCKET).remove(list);
+    } catch {
+      /* file đã mất thì thôi */
+    }
+    return;
+  }
+  for (const rel of list) {
     try {
       await fsp.unlink(resolveSafe(rel));
     } catch {
@@ -49,6 +117,22 @@ async function removeFiles(...rels) {
   }
 }
 
+/** File còn tồn tại không? (dùng cho script dọn bản ghi cũ) */
+async function exists(rel) {
+  if (!rel) return false;
+  try {
+    if (USE_SUPABASE) {
+      const res = await fetch(supabasePublicUrl(rel), { method: 'HEAD' });
+      return res.ok;
+    }
+    await fsp.access(resolveSafe(rel));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ----------------------------- Tải file từ fal ----------------------------- */
 // Chỉ tải về từ CDN của fal (tránh để client bắt server tải một link bất kỳ)
 function isFalUrl(value) {
   try {
@@ -74,7 +158,32 @@ async function fetchBuffer(url, maxBytes) {
   return buf;
 }
 
-// "/files/models/abc.glb" – đường dẫn công khai (được phục vụ bởi express.static ở server.js)
+/* ----------------------------- Đường dẫn công khai ----------------------------- */
+// Vẫn trả "/files/models/abc.glb" như cũ => frontend/Account KHÔNG phải sửa gì.
+// Route /files (filesMiddleware bên dưới) sẽ chuyển hướng sang URL Supabase.
 const publicPath = (rel) => (rel ? `/files/${rel}` : '');
 
-module.exports = { STORAGE_DIR, saveBuffer, saveThumb, removeFiles, isFalUrl, fetchBuffer, publicPath };
+const localStatic = express.static(STORAGE_DIR, { index: false, dotfiles: 'deny', maxAge: '7d' });
+const SAFE_REL = /^\/(models|exports|thumbs)\/[a-f0-9]{32}\.(glb|jpg|png|webp)$/;
+
+/** Dùng trong server.js:  app.use('/files', storage.filesMiddleware); */
+function filesMiddleware(req, res, next) {
+  if (!USE_SUPABASE) return localStatic(req, res, next);
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (!SAFE_REL.test(req.path)) return res.status(404).end();
+  res.set('Cache-Control', 'public, max-age=86400');
+  return res.redirect(302, supabasePublicUrl(req.path.slice(1)));
+}
+
+module.exports = {
+  STORAGE_DIR,
+  USE_SUPABASE,
+  saveBuffer,
+  saveThumb,
+  removeFiles,
+  exists,
+  isFalUrl,
+  fetchBuffer,
+  publicPath,
+  filesMiddleware,
+};

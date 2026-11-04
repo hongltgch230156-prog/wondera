@@ -9,6 +9,8 @@
 @use "./styles/handlab.scss";
 @use "./styles/auth.scss";
 @use "./styles/account.scss";
+@use "./styles/billing.scss";
+@use "./styles/puppet.scss"; 
 
 $themes: (
   light: (

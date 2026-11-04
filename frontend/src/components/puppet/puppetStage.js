@@ -1,0 +1,406 @@
+// frontend/src/components/puppet/puppetStage.js
+// ĐIỀU PHỐI Puppet Stage: nối giao diện (tab) + camera/bàn tay + engine luật chơi + renderer.
+// Handlab gọi: initPuppetStage() (một lần), startPuppetStage() khi vào tab, stopPuppetStage() khi rời tab / đóng Hand Lab.
+import { LAYOUT as L, TRACKING, HAND_ROLES } from "./puppetConfig.js";
+import { PRESET_PUPPETS, AI_PUPPET, EQUIPMENT, BALLS, svgUrl, loadImage, findBall, findEquipment } from "./puppetAssets.js";
+import { packageFromImage, listSaved, savePackage, removeSaved, restorePackage } from "./puppetStore.js";
+import { createUploader } from "./puppetUploader.js";
+import { cleanImage } from "./rigEngine.js";
+import { HandDriver } from "./handDriver.js";
+import { RallyEngine, GUARDS } from "./rallyEngine.js";
+import { solvePose, equipmentFrame } from "./poseSolver.js";
+import { StageRenderer, PuppetSprite } from "./puppetRenderer.js";
+import { Effects } from "./puppetEffects.js";
+import { fetchExports, isLoggedIn, loadAccountImage } from "./accountImages.js";
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = (t) => 1 - (1 - clamp(t, 0, 1)) ** 3;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const EQUIP_K = 0.55;                         // tỉ lệ vẽ vợt / vũ khí
+const ACTIVE = new Set(["countdown", "serve", "rally", "point", "climax", "finisher", "strike"]);
+const ICON_UP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>';
+const HEART = (on) => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" fill="${on ? "#e5598b" : "none"}" stroke="${on ? "#a8305f" : "#b9a6d6"}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+
+const S = {
+  ready: false, running: false, initPromise: null,
+  dom: null, renderer: null, driver: null, engine: null, fx: new Effects(), uploader: null,
+  registry: new Map(), pkgCache: new Map(),         // con rối: id -> { id, name, thumb, load() }
+  userId: null, userSprite: null, aiSprite: null,
+  equip: { armR: "pingpong", armL: "sword" }, equipHand: "armL", equipImgs: new Map(), shieldImg: null,
+  ballId: "pearl", ballImg: null, customBalls: [],
+  raf: 0, last: 0, t: 0,
+  userX: (L.USER_X_MIN + L.USER_X_MAX) / 2, rkPrev: null, rkVel: { x: 0, y: 0 },
+  knock: null, banner: { text: "", until: 0 }, shown: {}, paused: false,
+};
+
+/* ================================================================== */
+/*  KHỞI TẠO                                                           */
+/* ================================================================== */
+export function initPuppetStage() {
+  if (S.initPromise) return S.initPromise;
+  S.initPromise = (async () => {
+    const root = document.getElementById("tab-puppet-stage");
+    if (!root) throw new Error("Puppet Stage markup (#tab-puppet-stage) not found");
+    const q = (s) => root.querySelector(s);
+    S.dom = {
+      root, stage: q("#ps-stage"), canvas: q("#ps-canvas"), video: q("#ps-webcam"), camOverlay: q("#ps-cam-overlay"), live: q("#ps-live"),
+      overlay: q("#ps-overlay"), ovTitle: q("#ps-overlay [data-title]"), ovText: q("#ps-overlay [data-text]"), ovBtn: q("#ps-overlay [data-act='start']"),
+      hud: q("#ps-hud"), lives: q("#ps-lives"), su: q("#ps-score-user"), sa: q("#ps-score-ai"), energy: q("#ps-energy"), bannerEl: q("#ps-banner"), guard: q("#ps-guard"), tip: q("#ps-tip"),
+      puppetTiles: q("#ps-sel-puppet .ps-tiles"), equipTiles: q("#ps-sel-equip .ps-tiles"), ballTiles: q("#ps-sel-ball .ps-tiles"),
+      puppetName: q("#ps-puppet-name"), ballName: q("#ps-ball-name"), seg: q("#ps-sel-equip .ps-seg"),
+    };
+    S.renderer = new StageRenderer(S.dom.canvas);
+    S.engine = new RallyEngine(onEvent);
+    S.driver = new HandDriver({ video: S.dom.video, overlay: S.dom.camOverlay, onStatus: setStatus });
+    S.driver.simArea = S.dom.stage;
+    S.uploader = createUploader(S.dom.stage, { onUse: (pkg) => addCustomPuppet(pkg) });
+    bindUi(root);
+
+    // con rối + tài nguyên
+    for (const p of PRESET_PUPPETS) registerPreset(p);
+    for (const e of listSaved()) S.registry.set(e.id, { id: e.id, name: e.name, thumb: e.png, saved: true, load: async () => restorePackage(e) });
+    renderPuppetTiles(); renderEquipTiles(); renderBallTiles();
+    await Promise.all([S.renderer.loadBackground(), selectPuppet(PRESET_PUPPETS[0].id), loadAi(), loadShield(), selectBall("pearl", true), preloadEquip()]);
+    S.ready = true;
+    showOverlay("PUPPET STAGE", "Show your hand to the camera – your fingers pull the puppet’s strings.", "START");
+  })();
+  return S.initPromise;
+}
+
+function registerPreset(p) {
+  S.registry.set(p.id, { id: p.id, name: p.name, thumb: svgUrl(p.svg), load: async () => packageFromImage(await loadImage(svgUrl(p.svg)), p.name).pkg });
+}
+async function loadAi() { S.aiSprite = new PuppetSprite(...spriteArgs(await packageFromImage(await loadImage(svgUrl(AI_PUPPET.svg)), AI_PUPPET.name).pkg)); }
+const spriteArgs = (pkg) => [pkg.texture, pkg.rig, pkg.name];
+async function loadShield() { S.shieldImg = await loadImage(svgUrl(EQUIPMENT.shield.svg)); }
+async function preloadEquip() {
+  const all = [...EQUIPMENT.racket, ...EQUIPMENT.weapon];
+  await Promise.all(all.map(async (e) => S.equipImgs.set(e.id, await loadImage(svgUrl(e.svg)))));
+}
+
+/* ================================================================== */
+/*  GIAO DIỆN: ô chọn con rối / trang bị / quả cầu                      */
+/* ================================================================== */
+function bindUi(root) {
+  // nút mũi tên cuộn danh sách
+  root.querySelectorAll(".ps-sel").forEach((sec) => {
+    const tiles = sec.querySelector(".ps-tiles");
+    sec.querySelectorAll(".ps-arrow").forEach((b) => b.addEventListener("click", () => tiles.scrollBy({ left: Number(b.dataset.dir) * tiles.clientWidth * 0.8, behavior: "smooth" })));
+  });
+  // chọn con rối / trang bị / bóng
+  S.dom.puppetTiles.addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-rm]");
+    if (rm) { e.stopPropagation(); removeCustomPuppet(rm.dataset.rm); return; }
+    const t = e.target.closest(".ps-tile"); if (!t) return;
+    if (t.dataset.upload) S.uploader.open(); else selectPuppet(t.dataset.id);
+  });
+  S.dom.equipTiles.addEventListener("click", (e) => { const t = e.target.closest(".ps-tile"); if (t) { S.equip[S.equipHand] = t.dataset.id; renderEquipTiles(); } });
+  S.dom.seg.addEventListener("click", (e) => { const b = e.target.closest("button[data-hand]"); if (!b) return; S.equipHand = b.dataset.hand; renderEquipTiles(); });
+  S.dom.ballTiles.addEventListener("click", (e) => {
+    const t = e.target.closest(".ps-tile"); if (!t) return;
+    if (t.dataset.upload) openBallPicker(); else selectBall(t.dataset.id);
+  });
+  S.dom.ovBtn.addEventListener("click", startGame);
+}
+
+const tile = ({ id, label, img, selected, upload, removable }) =>
+  `<button type="button" class="ps-tile${selected ? " is-selected" : ""}${upload ? " ps-tile--upload" : ""}" ${upload ? 'data-upload="1"' : `data-id="${esc(id)}"`} role="option" aria-selected="${!!selected}" title="${esc(label)}">
+     ${upload ? `<span class="ps-tile-ico">${ICON_UP}</span>` : `<img src="${esc(img)}" alt="" draggable="false" />`}
+     <span class="ps-tile-cap">${esc(label)}</span>${removable ? `<i class="ps-tile-rm" data-rm="${esc(id)}" role="button" aria-label="Remove">×</i>` : ""}
+   </button>`;
+
+function renderPuppetTiles() {
+  const list = [...S.registry.values()];
+  S.dom.puppetTiles.innerHTML = tile({ label: "T-POSE", upload: true }) + list.map((p) => tile({ id: p.id, label: p.name.replace(/^Paper /, ""), img: p.thumb, selected: p.id === S.userId, removable: p.custom || p.saved })).join("");
+  const cur = S.registry.get(S.userId); S.dom.puppetName.textContent = (cur?.name || "").toUpperCase();
+}
+function renderEquipTiles() {
+  const role = HAND_ROLES[S.equipHand], list = EQUIPMENT[role] || [];
+  S.dom.equipTiles.innerHTML = list.map((e) => tile({ id: e.id, label: e.name, img: svgUrl(e.svg), selected: S.equip[S.equipHand] === e.id })).join("");
+  S.dom.seg.querySelectorAll("button").forEach((b) => { const on = b.dataset.hand === S.equipHand; b.classList.toggle("is-active", on); b.setAttribute("aria-selected", String(on)); });
+}
+function renderBallTiles() {
+  const all = [...BALLS.map((b) => ({ id: b.id, name: b.name, img: svgUrl(b.svg) })), ...S.customBalls.map((b) => ({ id: b.id, name: b.name, img: b.url }))];
+  S.dom.ballTiles.innerHTML = tile({ label: "UPLOAD", upload: true }) + all.map((b) => tile({ id: b.id, label: b.name.replace(/^Dragon /, ""), img: b.img, selected: b.id === S.ballId })).join("");
+  S.dom.ballName.textContent = (all.find((b) => b.id === S.ballId)?.name || "").toUpperCase();
+}
+
+async function selectPuppet(id) {
+  const entry = S.registry.get(id); if (!entry) return;
+  let pkg = S.pkgCache.get(id);
+  if (!pkg) { pkg = await entry.load(); S.pkgCache.set(id, pkg); }
+  S.userId = id; S.userSprite = new PuppetSprite(...spriteArgs(pkg));
+  renderPuppetTiles();
+}
+function addCustomPuppet(pkg) {
+  S.pkgCache.set(pkg.id, pkg);
+  S.registry.set(pkg.id, { id: pkg.id, name: pkg.name, thumb: pkg.texture.toDataURL("image/png"), custom: true, load: async () => pkg });
+  savePackage(pkg); selectPuppet(pkg.id);
+}
+function removeCustomPuppet(id) {
+  S.registry.delete(id); S.pkgCache.delete(id); removeSaved(id);
+  if (S.userId === id) selectPuppet(PRESET_PUPPETS[0].id); else renderPuppetTiles();
+}
+async function selectBall(id, silent) {
+  const custom = S.customBalls.find((b) => b.id === id);
+  S.ballId = id;
+  S.ballImg = custom ? await loadImage(custom.url) : await loadImage(svgUrl(findBall(id).svg));
+  if (!silent || S.dom) renderBallTiles();
+}
+
+/* ---- chọn bóng/vật phẩm từ file hoặc My 2D Exports ---- */
+function openBallPicker() {
+  const ov = document.createElement("div");
+  ov.className = "ps-up"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true");
+  ov.innerHTML = `<div class="ps-up-card ps-up-card--small"><div class="ps-up-head"><span class="ps-up-title">CHOOSE A BALL / ITEM</span><button type="button" class="ps-up-x" data-x aria-label="Close">×</button></div>
+    <div class="ps-up-body ps-up-body--single"><section class="ps-up-work">
+      <div class="ps-up-drop"><span class="ps-up-drop-ico">${ICON_UP}</span><p>Any picture works – the background is removed automatically.</p>
+        <div class="ps-up-btns"><button type="button" class="ps-btn" data-file>Choose file</button><button type="button" class="ps-btn ps-btn--ghost" data-exp>My 2D exports</button></div>
+        <input type="file" accept="image/png,image/jpeg,image/webp" hidden /></div>
+      <div class="ps-up-exports" hidden></div></section></div>
+    <div class="ps-up-foot"><span class="ps-up-status" data-s></span></div></div>`;
+  S.dom.stage.appendChild(ov);
+  const close = () => ov.remove(), status = ov.querySelector("[data-s]"), input = ov.querySelector("input"), exp = ov.querySelector(".ps-up-exports"), drop = ov.querySelector(".ps-up-drop");
+  const take = async (img, name) => {
+    try {
+      const c = cleanImage(img, 160).canvas, side = Math.max(c.width, c.height), out = document.createElement("canvas");
+      out.width = out.height = 128; const g = out.getContext("2d"), k = 116 / side;
+      g.drawImage(c, (128 - c.width * k) / 2, (128 - c.height * k) / 2, c.width * k, c.height * k);
+      const item = { id: "cb" + Date.now().toString(36), name: (name || "My item").slice(0, 16), url: out.toDataURL("image/png") };
+      S.customBalls = [item, ...S.customBalls].slice(0, 4);
+      await selectBall(item.id); close();
+    } catch { status.textContent = "Could not use this picture."; }
+  };
+  ov.addEventListener("click", async (e) => {
+    if (e.target === ov || e.target.closest("[data-x]")) return close();
+    if (e.target.closest("[data-file]")) return input.click();
+    const tileBtn = e.target.closest("[data-url]");
+    if (tileBtn) { status.textContent = "Loading…"; try { await take(await loadAccountImage(tileBtn.dataset.url), tileBtn.dataset.name); } catch { status.textContent = "Could not load that picture."; } return; }
+    if (e.target.closest("[data-back]")) { exp.hidden = true; drop.hidden = false; return; }
+    if (e.target.closest("[data-exp]")) {
+      drop.hidden = true; exp.hidden = false;
+      const back = '<button type="button" class="ps-btn ps-btn--ghost" data-back>Back</button>';
+      if (!isLoggedIn()) { exp.innerHTML = `<p class="ps-up-empty">Log in to use your 2D exports.</p>${back}`; return; }
+      exp.innerHTML = '<p class="ps-up-empty">Loading…</p>';
+      try {
+        const items = await fetchExports();
+        exp.innerHTML = items.length ? `<div class="ps-up-grid">${items.map((i) => `<button type="button" class="ps-up-tile" data-url="${esc(i.url)}" data-name="${esc(i.name)}"><img src="${esc(i.thumb)}" alt="" loading="lazy"><span>${esc(i.name)}</span></button>`).join("")}</div>${back}` : `<p class="ps-up-empty">No exports yet.</p>${back}`;
+      } catch { exp.innerHTML = `<p class="ps-up-empty">Could not load your exports.</p>${back}`; }
+    }
+  });
+  input.addEventListener("change", async () => {
+    const f = input.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    try { await take(await loadImage(url), f.name.replace(/\.[^.]+$/, "")); } catch { status.textContent = "Could not open this picture."; } finally { URL.revokeObjectURL(url); }
+  });
+  ov.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
+  ov.querySelector(".ps-up-x").focus();
+}
+
+/* ================================================================== */
+/*  VÒNG ĐỜI                                                           */
+/* ================================================================== */
+export async function startPuppetStage() {
+  await initPuppetStage();
+  if (S.running) return;
+  S.running = true; S.last = performance.now();
+  S.driver.start();                              // camera + MediaPipe (hoặc chuột nếu không có camera)
+  S.raf = requestAnimationFrame(frame);
+}
+export function stopPuppetStage() {
+  if (!S.initPromise) return;
+  S.running = false; cancelAnimationFrame(S.raf);
+  S.driver?.stop();
+  S.engine?.reset(); S.fx.clear();
+  S.uploader?.close();
+  if (S.dom) { setLive("off", "OFF"); showOverlay("PUPPET STAGE", "Show your hand to the camera – your fingers pull the puppet’s strings.", "START"); S.dom.hud.hidden = true; }
+}
+function startGame() {
+  if (!S.ready) return;
+  S.fx.clear(); S.knock = null; S.engine.start();
+  S.dom.overlay.hidden = true; S.dom.hud.hidden = false; S.dom.guard.hidden = true;
+  S.dom.tip.textContent = S.driver.mode === "sim" ? "Mouse mode: move the mouse, Space = swing, keys 1-5 fold a finger" : "Move your hand – each finger pulls one of the puppet’s limbs";
+  updateHud(true);
+}
+function showOverlay(title, text, btn) {
+  S.dom.ovTitle.textContent = title; S.dom.ovText.textContent = text; S.dom.ovBtn.textContent = btn; S.dom.overlay.hidden = false;
+}
+function setLive(state, text) { S.dom.live.dataset.state = state; S.dom.live.querySelector("b").textContent = text; }
+function setStatus(text, level) {
+  if (!S.dom) return;
+  S.dom.tip.textContent = text;
+  if (S.driver.mode === "camera") setLive("on", "LIVE"); else if (S.driver.mode === "sim") setLive("sim", "MOUSE"); else setLive(level === "error" ? "off" : "wait", level === "error" ? "NO CAM" : "…");
+}
+
+/* ================================================================== */
+/*  SỰ KIỆN TỪ ENGINE                                                  */
+/* ================================================================== */
+function say(text, sec = 1) { S.banner = { text, until: S.t + sec }; }
+function onEvent(type, d) {
+  const fx = S.fx;
+  switch (type) {
+    case "countdown": say(String(d.n), 0.95); break;
+    case "serve": say("RALLY!", 0.8); break;
+    case "hit": fx.hit(d.x, d.y, d.power); fx.float(d.x, d.y - 24, "+" + d.gain, "#fff3b0"); break;
+    case "aiReturn": fx.hit(d.x, d.y, 0.6, "#ffd0a0"); break;
+    case "bounce": fx.bounce(d.x, d.y); break;
+    case "point": say(d.who === "user" ? "POINT!" : "MISS!", 1.2); S.dom.tip.textContent = d.reason; updateHud(true); break;
+    case "climax": say("POWER FULL!", 1.4); break;
+    case "finisherStart": say("SWING NOW!  →", 99); S.dom.guard.hidden = false; S.dom.tip.textContent = "Swing your ring finger across the shield’s open side – up, across or down."; paintGuard(S.engine.ai.guard); break;
+    case "guard": paintGuard(d.guard); break;
+    case "strike": say(d.blocked ? "…" : "STRIKE!", 0.6); break;
+    case "blocked": say("BLOCKED!", 1.2); S.knock = { t: 0 }; fx.hit(S.engine.ai.shieldX, S.engine.ai.shieldY, 1, "#ffe08a"); break;
+    case "shatter": say("K.O.!", 1.4); { const a = S.engine.ai; fx.shards(L.AI_X + a.knockX, 700, 150, 320, ["#c9a46a", "#7b3d2c", "#e8dccb", "#2a1a14"]); } break;
+    case "fizzle": say("TOO SLOW…", 1.2); S.dom.guard.hidden = true; S.dom.tip.textContent = "Keep rallying to charge the power bar again"; break;
+    case "result":
+      S.dom.guard.hidden = true; S.dom.tip.textContent = "";
+      if (d.kind === "win") fx.confetti(1484, 1060, ["#ffd34d", "#e9895f", "#8a78c0", "#6fae8a", "#f59fc0"]);
+      showOverlay(d.kind === "win" ? "YOU WIN!" : "GAME OVER", d.reason + ` · Score ${d.score.user}–${d.score.ai}`, "PLAY AGAIN");
+      break;
+    default: break;
+  }
+}
+function paintGuard(g) { S.dom.guard.querySelectorAll("[data-g]").forEach((n) => n.classList.toggle("is-guarded", Number(n.dataset.g) === g)); }
+function updateHud(force) {
+  const e = S.engine, sh = S.shown;
+  if (force || sh.lives !== e.lives) { S.dom.lives.innerHTML = Array.from({ length: 3 }, (_, i) => HEART(i < e.lives)).join(""); sh.lives = e.lives; }
+  if (force || sh.su !== e.score.user) { S.dom.su.textContent = e.score.user; sh.su = e.score.user; }
+  if (force || sh.sa !== e.score.ai) { S.dom.sa.textContent = e.score.ai; sh.sa = e.score.ai; }
+  const en = Math.round(e.energy); if (force || sh.en !== en) { S.dom.energy.style.width = en + "%"; S.dom.energy.parentElement.classList.toggle("is-full", en >= 100); sh.en = en; }
+}
+
+/* ================================================================== */
+/*  MỖI KHUNG HÌNH                                                     */
+/* ================================================================== */
+const V0 = { thumb: { x: -1.1, y: -0.7 }, index: { x: -0.5, y: -2.3 }, middle: { x: 0, y: -2.5 }, ring: { x: 0.5, y: -2.2 }, pinky: { x: 1.0, y: -1.7 } };
+
+function frame(now) {
+  if (!S.running) return;
+  S.raf = requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - S.last) / 1000); S.last = now; S.t += dt;
+  if (!S.ready || !S.userSprite || !S.aiSprite) return;
+  const h = S.driver, eng = S.engine;
+
+  // --- tạm dừng khi mất bàn tay giữa trận ---
+  const lost = ACTIVE.has(eng.phase) && !h.present && h.lostForMs > TRACKING.LOST_MS && S.driver.mode === "camera";
+  if (lost !== S.paused) { S.paused = lost; if (lost) say("SHOW YOUR HAND", 999); else S.banner.until = 0; }
+
+  const user = buildUser(h, dt);
+  S.dbg = user;                                          // để debug/test
+  const swing = h.consumeSwing();                       // luôn xả cú vung để không bị "tồn" sang giai đoạn sau
+  if (!S.paused) {
+    eng.update(dt, { racket: user.racket, swing: eng.phase === "finisher" ? swing : null });
+    S.fx.update(dt);
+    if (S.knock) S.knock.t += dt;
+  }
+  updateHud(false);
+  if (S.banner.until && S.t > S.banner.until) S.banner.until = 0;
+  S.dom.bannerEl.textContent = S.banner.until ? S.banner.text : "";
+  S.dom.bannerEl.classList.toggle("is-on", !!S.banner.until);
+
+  const ai = buildAi(dt);
+  const sh = eng.shake > 0 ? { x: (Math.random() - 0.5) * 18 * eng.shake, y: (Math.random() - 0.5) * 18 * eng.shake } : null;
+  const hs = handShadow(h, user.pose);
+  S.renderer.render({
+    dim: eng.phase === "finisher" || eng.phase === "strike" || eng.phase === "climax" ? 0.18 : 0,
+    overlayGlow: eng.phase === "finisher" ? 1 : 0, shake: sh,
+    hand: hs?.hand, strings: hs?.strings,
+    puppets: [ai.view, user.view],
+    ball: eng.ball, ballImg: S.ballImg, fx: S.fx,
+  });
+}
+
+/** Con rối người chơi: bàn tay -> tư thế */
+function buildUser(h, dt) {
+  const sp = S.userSprite, eng = S.engine, rig = sp.rig, s = sp.scale, present = h.present || h.mode === "sim";
+  // --- vị trí thân ---
+  const [r0, r1] = TRACKING.ROOT_X_RANGE;
+  let tx = lerp(L.USER_X_MIN, L.USER_X_MAX, clamp((h.palm.x - r0) / (r1 - r0), 0, 1));
+  let jump = clamp((0.58 - h.palm.y) * TRACKING.JUMP_PER_UNIT, 0, TRACKING.JUMP_MAX);
+  if (!present) { tx = (L.USER_X_MIN + L.USER_X_MAX) / 2 + Math.sin(S.t * 0.8) * 10; jump = 0; }
+  S.userX += (tx - S.userX) * Math.min(1, dt * 14);
+  let x = S.userX;
+  const ph = eng.phase;
+  if (ph === "climax" || ph === "finisher" || ph === "strike") jump = eng.user.jump;
+  if (ph === "strike") x += 130 * ease(eng.user.strikeT);
+  if (S.knock) x -= 170 * ease(S.knock.t / 0.5);
+  const root = { x, y: L.FLOOR_Y - sp.hipToFeet - jump };
+
+  const lean = present ? clamp(h.roll * 0.9, -0.5, 0.5) : Math.sin(S.t * 1.3) * 0.03;
+  const base = solvePose(rig, { scale: s, root, lean });
+  const J = base.joints, vec = present ? h.vec : V0;
+  const gain = (r) => (r / TRACKING.FINGER_REACH) * 1.5;
+  const rR = base.reach.armR, rL = base.reach.armL, lg = base.reach.legR;
+  const targets = {
+    wristR: { x: J.shoulderR.x + 0.55 * rR + (vec.index.x - V0.index.x) * gain(rR), y: J.shoulderR.y + 0.25 * rR + (vec.index.y - V0.index.y) * gain(rR) },
+    wristL: { x: J.shoulderL.x + 0.45 * rL + (vec.ring.x - V0.ring.x) * gain(rL), y: J.shoulderL.y - 0.15 * rL + (vec.ring.y - V0.ring.y) * gain(rL) },
+    ankleR: { x: J.hipR.x - 0.1 * lg + (vec.thumb.x - V0.thumb.x) * 0.22 * lg, y: J.hipR.y + 0.97 * lg + (vec.thumb.y - V0.thumb.y) * 0.18 * lg },
+    ankleL: { x: J.hipL.x + 0.1 * lg + (vec.pinky.x - V0.pinky.x) * 0.22 * lg, y: J.hipL.y + 0.97 * lg + (vec.pinky.y - V0.pinky.y) * 0.18 * lg },
+  };
+  if (eng.user.strikeT >= 0 && ph === "strike") {                    // cú chém trên không
+    const p = ease(eng.user.strikeT), hgt = eng.user.strikeHeight;
+    const end = [{ x: 2.0, y: -0.6 }, { x: 2.1, y: 0.2 }, { x: 1.9, y: 0.95 }][hgt];
+    targets.wristL = { x: J.shoulderL.x + lerp(-0.4, end.x, p) * rL, y: J.shoulderL.y + lerp(-1.3, end.y, p) * rL - Math.sin(Math.PI * p) * 0.25 * rL };
+  }
+  const mid = vec.middle;
+  const pose = solvePose(rig, {
+    scale: s, root, lean,
+    headTilt: present ? clamp(mid.x * 0.25, -0.45, 0.45) : 0,
+    headBob: present ? clamp((-mid.y - 2.4) * 10, -12, 12) : 0,
+    targets,
+  });
+
+  // --- vợt / vũ khí ---
+  const equip = [], racketArm = Object.keys(HAND_ROLES).find((a) => HAND_ROLES[a] === "racket");
+  let racket = null;
+  for (const arm of Object.keys(HAND_ROLES)) {
+    const kind = HAND_ROLES[arm], spec = findEquipment(kind, S.equip[arm]); if (!spec) continue;
+    const side = arm === "armR" ? "R" : "L";
+    const wrist = pose.joints["wrist" + side], elbow = pose.joints["elbow" + side], dir = Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x);
+    const fr = kind === "racket"
+      ? equipmentFrame(pose, side, spec, EQUIP_K, clamp(0.4 * (dir + Math.PI / 2), -0.9, 0.9), true)   // vợt luôn dựng gần thẳng đứng
+      : equipmentFrame(pose, side, spec, EQUIP_K, 0.35);
+    equip.push({ img: S.equipImgs.get(spec.id), spec, frame: fr });
+    if (arm === racketArm && fr.head) {
+      if (S.rkPrev && dt > 0) {
+        const vx = (fr.head.x - S.rkPrev.x) / dt, vy = (fr.head.y - S.rkPrev.y) / dt;
+        S.rkVel.x += (vx - S.rkVel.x) * 0.5; S.rkVel.y += (vy - S.rkVel.y) * 0.5;
+      }
+      S.rkPrev = { x: fr.head.x, y: fr.head.y };
+      racket = { x: fr.head.x, y: fr.head.y, vx: S.rkVel.x, vy: S.rkVel.y };
+    }
+  }
+  return { pose, racket: present ? racket : null, view: { sprite: sp, pose, equip, flash: eng.user.flash } };
+}
+
+/** Con rối AI: tự động theo engine */
+function buildAi(dt) {
+  const sp = S.aiSprite, eng = S.engine, a = eng.ai, s = sp.scale;
+  const hop = eng.phase === "rally" ? Math.max(0, Math.sin(S.t * 5)) * 4 : 0;
+  const root = { x: L.AI_X + a.knockX - a.recoil * 22, y: L.FLOOR_Y - sp.hipToFeet - hop };
+  const base = solvePose(sp.rig, { scale: s, root });
+  const J = base.joints, r = base.reach.armL;
+  const pose = solvePose(sp.rig, {
+    scale: s, root, lean: -0.03 + Math.sin(S.t * 1.7) * 0.02,
+    targets: { wristR: { x: a.shieldX - 6, y: a.shieldY }, wristL: { x: J.shoulderL.x + 0.5 * r + Math.sin(S.t * 2.2) * 8, y: J.shoulderL.y + 0.7 * r } },
+  });
+  const frame0 = equipmentFrame(pose, "R", EQUIPMENT.shield, 0.62, 0, true);
+  return { pose, view: { sprite: sp, pose, alpha: a.shattered ? 0 : 1, flash: a.flash, equip: a.shattered ? [] : [{ img: S.shieldImg, spec: EQUIPMENT.shield, frame: frame0, glow: a.flash }] } };
+}
+
+/** Bóng bàn tay khổng lồ hắt lên phông + dây nối tới các khớp con rối */
+function handShadow(h, pose) {
+  if (!h.present && h.mode !== "sim") return null;
+  const U = 78, cx = S.userX + 70, cy = 210, pts = h.lm.map((p) => ({ x: cx + (p.x - h.palm.x) / h.hs * U, y: cy + (p.y - h.palm.y) / h.hs * U }));
+  const J = pose.joints, tip = (i) => pts[i];
+  return {
+    hand: { pts, unit: U * 0.5, alpha: 1 },
+    strings: [
+      { from: tip(12), to: J.head }, { from: tip(8), to: J.wristR }, { from: tip(16), to: J.wristL },
+      { from: tip(4), to: J.ankleR }, { from: tip(20), to: J.ankleL },
+    ],
+  };
+}
+
+export const __puppetState = S;            // chỉ để debug/test

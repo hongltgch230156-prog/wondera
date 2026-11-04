@@ -22,6 +22,7 @@
  */
 
 import { readProgress, syncProgress } from "./gameProgress.js";
+import { fetchWallet, onWalletChange, openBuyCredits, getWallet } from "./billing.js";
 
 const DEMO = typeof location !== "undefined" && new URLSearchParams(location.search).has("accountDemo");
 
@@ -43,6 +44,7 @@ const IC = {
   image: stroke(`<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/>`),
   card: stroke(`<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h3"/>`),
   crown: stroke(`<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>`),
+  coin: stroke(`<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1 1.1-1.7 2.5-1.7s2.5.7 2.5 1.7-1.1 1.6-2.5 1.9-2.5.9-2.5 2 1.1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/>`),
   download: stroke(`<path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>`),
   puzzle: stroke(`<path d="M10 3a2 2 0 1 1 4 0v1.5h3.5A1.5 1.5 0 0 1 19 6v3.5h1.5a2 2 0 1 1 0 4H19V17a1.5 1.5 0 0 1-1.5 1.5H14V17a2 2 0 1 0-4 0v1.5H6.5A1.5 1.5 0 0 1 5 17v-3.5h1.5a2 2 0 1 0 0-4H5V6a1.5 1.5 0 0 1 1.5-1.5H10z"/>`),
   logout: stroke(`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>`),
@@ -254,14 +256,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
         </div>
         <div class="account-grid" role="tabpanel"></div>
         <div class="account-game"></div>
-        <div class="account-plan">
-          <div class="account-plan-icon">${IC.card}</div>
-          <div class="account-plan-text">
-            <p class="account-plan-title">Plan &amp; Billing <span class="account-badge">Coming soon</span></p>
-            <p class="account-plan-sub">Upgrade your plan and unlock more features.</p>
-          </div>
-          <button class="account-upgrade" type="button" disabled>${IC.crown}<span>Upgrade plan</span></button>
-        </div>
+        <div class="account-credits"></div>
       </div>
       <div class="account-toast" role="status" aria-live="polite"></div>
     </section>
@@ -285,6 +280,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
   const elGrid = $(".account-grid");
   const elToast = $(".account-toast");
   const elGame = $(".account-game");
+  const elCredits = $(".account-credits");
   const viewer = $(".account-viewer");
   const viewerStage = $(".account-viewer-stage");
   const viewerTitle = $(".account-viewer-title");
@@ -479,12 +475,51 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
       </div>`;
   }
 
+  let showAllTx = false;
+  const TX_PREVIEW = 5;
+
+  function renderCredits() {
+    // ?accountDemo: số liệu mẫu để xem giao diện khi chưa có backend
+    const w = DEMO && !getWallet().loaded
+      ? { loaded: true, credits: 12, history: [
+          { id: 1, type: "purchase", delta: 20, note: "Bought 20 credits", createdAt: "2026-10-18" },
+          { id: 2, type: "usage", delta: -1, note: "Magic Wand object", createdAt: "2026-10-18" },
+          { id: 3, type: "usage", delta: -1, note: "Magic Wand object", createdAt: "2026-10-17" },
+          { id: 4, type: "bonus", delta: 2, note: "Welcome bonus", createdAt: "2026-10-15" },
+        ] }
+      : getWallet();
+    const rows = w.history || [];
+    const shown = showAllTx ? rows : rows.slice(0, TX_PREVIEW);
+    elCredits.innerHTML = `
+      <div class="account-credits-head">
+        <div class="account-plan-icon">${IC.coin}</div>
+        <div class="account-plan-text">
+          <p class="account-plan-title">Credits</p>
+          <p class="account-plan-sub">1 credit = 1 Magic Wand 3D object</p>
+        </div>
+        <div class="account-credits-balance"><strong>${w.credits === null || w.credits === undefined ? "–" : esc(w.credits)}</strong><span>credits</span></div>
+        <button class="account-pill account-buy" type="button" data-act="buy-credits">${IC.coin}<span>Buy credits</span></button>
+      </div>
+      ${rows.length ? `
+        <ul class="account-tx">
+          ${shown.map((t) => `
+            <li>
+              <span class="tx-note" title="${esc(t.note)}">${esc(t.note || t.type)}</span>
+              <span class="tx-date">${esc(fmtDate(t.createdAt))}</span>
+              <b class="tx-delta ${t.delta >= 0 ? "is-plus" : "is-minus"}">${t.delta > 0 ? "+" : ""}${esc(t.delta)}</b>
+            </li>`).join("")}
+        </ul>
+        ${rows.length > TX_PREVIEW ? `<button class="account-tx-more" type="button" data-act="toggle-tx">${showAllTx ? "Show less" : `Show all (${rows.length})`}</button>` : ""}`
+        : w.loaded ? `<p class="account-tx-empty">No transactions yet.</p>` : ""}`;
+  }
+
   function renderAll() {
     renderProfile();
     renderStats();
     renderTabs();
     renderGrid();
     renderGame();
+    renderCredits();
   }
 
   /* ---------- hành động ---------- */
@@ -632,6 +667,14 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     renderGrid();
   }));
 
+  elCredits.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    if (b.dataset.act === "buy-credits") openBuyCredits();
+    else if (b.dataset.act === "toggle-tx") { showAllTx = !showAllTx; renderCredits(); }
+  });
+  onWalletChange(() => { if (root.classList.contains("is-open")) renderCredits(); });
+
   elGrid.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
@@ -676,6 +719,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     // lần đầu / lần trước lỗi: tải có skeleton; các lần sau: làm mới ngầm để thấy model mới vừa tạo
     const firstLoad = state.lists.models === null || state.lists.exports === null || state.failed;
     load(!firstLoad);
+    if (!DEMO) fetchWallet();   // số dư + lịch sử credits luôn mới nhất
     // kéo tiến độ game mới nhất từ server (vd. vừa chơi ở máy khác), xong thì vẽ lại khối Snap & Solve
     if (!DEMO) syncProgress().then(() => { if (root.classList.contains("is-open")) renderGame(); });
   }

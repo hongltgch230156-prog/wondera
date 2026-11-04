@@ -10,6 +10,8 @@ import {
   DrawingUtils
 } from "@mediapipe/tasks-vision";
 
+const dbg = { ms: 0, n: 0, t: performance.now() };
+
 // const VISION_WASM_URL =
 //   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm";
 
@@ -446,7 +448,15 @@ function processFrame() {
     // setOnHandTracking(callback) chỉ khác null khi đang chơi ghép hình
     const isPlayingPuzzle = !!onHandTrackingCallback;
 
+    const t0 = performance.now();
     detectGesture(timestamp);
+
+    dbg.ms += performance.now() - t0; dbg.n++;
+    if (performance.now() - dbg.t > 1000) {
+      console.log(`tracking ${dbg.n} fps, ${(dbg.ms / dbg.n).toFixed(1)} ms/frame`);
+      Object.assign(dbg, { ms: 0, n: 0, t: performance.now() });
+    }
+    // khai báo ở đầu file: const dbg = { ms: 0, n: 0, t: performance.now() };
 
     if (isPlayingPuzzle) {
       // Chỉ cần theo dõi tay: bỏ nhận diện khuôn mặt, cập nhật UI "khung ảnh" và đếm giờ chụp
@@ -543,21 +553,24 @@ function updateMemeUI() {
 /**
  * Start Meme Search detector
  */
-let activeTabId = "meme-search"; 
+let activeTabId = "meme-search";
+let startToken = 0; // tăng mỗi lần stop/start để hủy lần khởi động đang chờ dở
 
 export async function startDetector(tabId = "meme-search") {
   activeTabId = tabId; // Lưu lại tab hiện tại
   if (isRunning) return;
+  const myToken = ++startToken;
 
   // Tự động nhận diện video của tab tương ứng
   const videoId = tabId === "meme-search" ? "hl-webcam-meme" : "hl-webcam-puzzle";
   videoElement = document.getElementById(videoId);
-
   if (!videoElement) return;
 
   try {
     await initializeMediaPipe();
+    if (myToken !== startToken) return;          // đã bị stop trong lúc tải model
     await startCamera();
+    if (myToken !== startToken) { stopCamera(); return; } // đã bị stop trong lúc xin camera
     isRunning = true;
     processFrame();
   } catch (error) {
@@ -566,15 +579,20 @@ export async function startDetector(tabId = "meme-search") {
 }
 
 /**
- * Stop Meme Search detector
+ * Stop detector: dừng vòng lặp, tắt camera, xóa callback
  */
 export function stopDetector() {
+  startToken++;
   isRunning = false;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = null;
   }
   stopCamera();
+  const mini = document.getElementById("hl-webcam-mini"); // video nhỏ dùng chung stream của game
+  if (mini) mini.srcObject = null;
+  onHandTrackingCallback = null;
+  resetAutoScan();
 }
 
 /**

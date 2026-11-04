@@ -15,6 +15,11 @@ const accountRoutes = require('./routes/accountRoutes');
 const storage = require('./utils/storage');
 const { trackModelTask, finalizeModelTask } = require('./utils/modelTasks');
 
+const paymentRoutes = require('./routes/paymentRoutes');
+const paymentWebhooks = require('./routes/paymentWebhooks');
+const credits = require('./utils/credits');
+const { COSTS } = require('./config/pricing');
+
 dotenv.config();
 const gemini = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -26,19 +31,26 @@ mongoose
   .catch((err) => { console.error('Lỗi kết nối MongoDB:', err.message); process.exit(1); });
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Cho phép Frontend (chạy trên port 5173) gọi API tới Backend (chạy trên port 3000)
 app.use(cors());
+
+// Cổng thanh toán (VNPay/Polar) gọi vào đây - KHÔNG có token. PHẢI đặt TRƯỚC express.json() vì Polar cần body gốc.
+app.use('/webhooks', paymentWebhooks);
+
 //app.use(express.json());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.use('/files', express.static(storage.STORAGE_DIR, { index: false, dotfiles: 'deny', maxAge: '7d' }));
+app.use('/files', storage.filesMiddleware);
 
 app.use('/api/auth', authRoutes); // đăng ký / đăng nhập / google / me (không cần token)
 app.use('/api', requireAuth);     // tất cả API còn lại BẮT BUỘC có token
 
 app.use('/api/account', accountRoutes); // trang Account: model 3D + ảnh 2D của user
+
+app.use('/api/payments', paymentRoutes); // ví credits + thanh toán
 
 // Lưu file ảnh tạm vào bộ nhớ RAM (memoryStorage) để chuyển tiếp đi ngay
 const upload = multer({ storage: multer.memoryStorage() });
@@ -155,7 +167,11 @@ app.get('/api/task-status/:taskId', async (req, res) => {
     let mappedProgress = 0;
     if (status.status === "IN_PROGRESS") { mappedStatus = "running"; mappedProgress = 50; }
     if (status.status === "COMPLETED") { mappedStatus = "success"; mappedProgress = 100; }
-    if (status.status === "FAILED") { mappedStatus = "failed"; }
+    if (status.status === "FAILED") {
+      mappedStatus = "failed";
+      // Task lỗi -> hoàn lại credit (chỉ hoàn được một lần, chỉ cho đúng chủ task)
+      credits.refundByTask(req.user._id, taskId, 'generation failed').catch((e) => console.error('[credits] refund:', e.message));
+    }
     
     let responseData = { code: 0, data: { status: mappedStatus, progress: mappedProgress } };
     
@@ -173,6 +189,7 @@ app.get('/api/task-status/:taskId', async (req, res) => {
         responseData.data.output = { model: fileUrl };
         // Lưu vào tài khoản + tải file .glb về server (chạy nền, không chặn phản hồi)
         if (fileUrl) finalizeModelTask(req.user._id, taskId, fileUrl);
+        else credits.refundByTask(req.user._id, taskId, 'no model file returned').catch((e) => console.error('[credits] refund:', e.message));
     }
     res.json(responseData);
   } catch (error) {
@@ -420,26 +437,38 @@ app.post('/api/magic-wand', upload.single('source'), async (req, res) => {
 
 // --- API 6: Tạo model Trellis-2 từ vật thể đã chọn ---
 app.post('/api/magic-wand/create', async (req, res) => {
+  let usageKey = null;
   try {
     const isolatedImageUrl = String(req.body?.image_url || '').trim();
     if (!/^https?:\/\//i.test(isolatedImageUrl)) {
       throw new Error("Thiếu ảnh vật thể đã tách");
     }
-
+    // Trừ credit TRƯỚC khi gọi AI (an toàn khi nhiều request cùng lúc). Hết credit -> 402.
+    const paid = await credits.debit(req.user._id, COSTS.magicWandObject, { note: 'Magic Wand object' });
+    if (!paid.ok) {
+      return res.status(402).json({
+        error: 'Bạn đã hết credits Magic Wand.',
+        code: 'INSUFFICIENT_CREDITS',
+        credits: paid.balance,
+      });
+    }
+    usageKey = paid.key;
     const { request_id } = await fal.queue.submit("fal-ai/trellis-2", {
       input: {
         image_url: isolatedImageUrl
       }
     });
-
+    await credits.attachTask(usageKey, request_id); // để biết task nào cần hoàn credit nếu lỗi
     console.log(`[Magic Wand] Đã gửi vật thể sang Trellis-2: ${request_id}`);
     await trackModelTask(req.user._id, request_id, {
       kind: 'magic',
       name: 'Magic Wand object',
       thumbUrl: isolatedImageUrl,
     });
-    res.json({ code: 0, data: { task_id: request_id } });
+    res.json({ code: 0, data: { task_id: request_id, credits: paid.balance } });
   } catch (error) {
+    // Chưa gửi được lên AI -> trả lại credit đã trừ
+    if (usageKey) await credits.refundUsage(usageKey, 'could not start generation').catch(() => {});
     console.error("Lỗi tạo model Magic Wand:", error);
     res.status(500).json({ error: error.message });
   }

@@ -11,8 +11,8 @@ import themeFragmentShader from "./shaders/theme/fragment.glsl";
 import { initForge } from "./components/forge.js";
 import { MascotController } from "./components/MascotController.js";
 import { ChatbotUI } from "./components/ChatbotUI.js";
-import { initHandLab } from "./components/handlab.js";
-import { initAuth } from "./components/auth.js";
+import { openHandLab, closeHandLab } from "./components/handlab.js";
+import { initAuth, API_BASE } from "./components/auth.js";
 import { createVoiceApi } from "./components/voice.js";
 initAuth();
 
@@ -365,23 +365,19 @@ const showModal = (modal) => {
 
 const hideModal = (modal) => {
   isModalOpen = false;
-
   controls.enabled = true;
-
-  gsap.to(overlay, {
-    opacity: 0,
-    duration: 0.5,
-  });
-
+  gsap.to(overlay, { opacity: 0, duration: 0.5 });
   gsap.to(modal, {
     opacity: 0,
     scale: 0,
     duration: 0.5,
     ease: "back.in(2)",
-
     onComplete: () => {
       modal.style.display = "none";
       overlay.style.display = "none";
+      // Reset sau khi hiệu ứng đóng xong để khỏi thấy nội dung biến mất giữa chừng
+      if (modal.classList.contains("hand-lab-modal")) closeHandLab();
+      else if (modal.classList.contains("work")) forgeApi?.reset();
     },
   });
 };
@@ -1870,7 +1866,7 @@ function shouldUseOriginalMesh(objectName) {
 async function sendChatMessage(text, lang = "en") {
   try {
     if (chatbotMascot) chatbotMascot.setThinking();
-    const response = await fetch("http://localhost:3000/api/chat", {
+    const response = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2065,7 +2061,7 @@ function handleRaycasterInteraction() {
       const handLabModal = document.querySelector(".hand-lab-modal");
       if (handLabModal) {
         showModal(handLabModal);
-        initHandLab();
+        openHandLab();
       }
     }
   }
@@ -2219,7 +2215,7 @@ window.addEventListener(
 window.addEventListener("click", handleRaycasterInteraction);
 
 const voiceApi = createVoiceApi({
-  baseUrl: "http://localhost:3000",
+  baseUrl: API_BASE,
 });
 
 const chatbotUI = new ChatbotUI({
@@ -2390,7 +2386,7 @@ muteToggleButton.addEventListener(
   { passive: false }
 );
 
-initForge();
+const forgeApi = initForge();
 //initHandLab();
 
 // Themeing stuff

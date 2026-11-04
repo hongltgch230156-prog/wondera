@@ -1,12 +1,13 @@
 import { SCENE_SVG } from "./authScene.js";
 import { mountAccountButton } from "./account.js";
 import { configureProgress } from "./gameProgress.js";
+import { configureBilling, fetchWallet, handlePaymentReturn } from "./billing.js";
 
 /* ------------------------------------------------------------------ */
 /*  Cấu hình                                                           */
 /* ------------------------------------------------------------------ */
 const ENV = import.meta.env || {};
-export const API_BASE = (ENV.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+export const API_BASE = (ENV.VITE_API_URL || "").replace(/\/$/, "");
 const GOOGLE_CLIENT_ID = ENV.VITE_GOOGLE_CLIENT_ID || "";
 const TOKEN_KEY = "forge_auth_token";
 const BRAND = { name: "Wondera", tagline: "CREATE · EXPLORE · INTERACT" }; // đổi tên thương hiệu ở đây
@@ -662,7 +663,10 @@ function createAuthUI(onSuccess) {
 /* ------------------------------------------------------------------ */
 function mountAccount(user) {
   configureProgress({ userId: user.id, apiBase: API_BASE, getToken });
+  configureBilling({ apiBase: API_BASE, getToken });
   mountAccountButton({ user, apiBase: API_BASE, getToken, onLogout: logout });
+  fetchWallet();          // số credits cho 3D Forge và trang Account
+  handlePaymentReturn();  // khách vừa quay về từ cổng thanh toán (?payment=...)
 }
 
 /* ------------------------------------------------------------------ */
