@@ -310,6 +310,25 @@
   &:empty { display: none; }
 }
 
+/* ---- thanh lực vung (hiện ở giai đoạn kết liễu) ---- */
+.ps-swing {
+  position: absolute;
+  right: 12px;
+  top: 142px;
+  width: 128px;
+  padding: 5px 9px 7px;
+  border: 2px solid vars.$base-purple;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: vars.$base-dark-purple;
+  &[hidden] { display: none; }
+  .ps-swing-bar { margin-top: 4px; height: 10px; border-radius: 999px; background: #e2cdef; overflow: hidden; }
+  i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #8b7acb, #f2a93b); }
+}
+
 /* ---- màn chờ / kết quả ---- */
 .ps-overlay {
   position: absolute;
@@ -322,7 +341,7 @@
   &[hidden] { display: none; }
 }
 .ps-ov-card {
-  max-width: 340px;
+  max-width: 380px;
   padding: 16px 22px 18px;
   text-align: center;
   background: #fff;
@@ -331,6 +350,18 @@
   h3 { margin: 0 0 4px; font: 800 1.35rem 'Baloo 2', 'Nunito', sans-serif; letter-spacing: 0.08em; color: vars.$base-dark-purple; }
   p { margin: 0 0 12px; font-size: 0.78rem; font-weight: 700; line-height: 1.35; color: rgba(108, 63, 124, 0.85); }
 }
+.ps-ov-rules {
+  margin: 0 0 12px;
+  padding: 0 0 0 16px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: vars.$base-dark-purple;
+  li { margin-bottom: 3px; }
+  b { color: vars.$base-purple; }
+}
+.ps-overlay:not([data-mode="idle"]) .ps-ov-rules { display: none; }
 
 /* ---- nút dùng chung ---- */
 .ps-btn {

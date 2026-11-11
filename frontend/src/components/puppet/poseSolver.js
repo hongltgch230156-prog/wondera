@@ -1,26 +1,30 @@
 // frontend/src/components/puppet/poseSolver.js
 // Giải tư thế con rối từ rig + các mục tiêu (cổ tay, mắt cá) trên sân khấu.
 // Thuần toán học, không đụng DOM -> test được và dùng chung cho con rối người chơi lẫn con rối AI.
-
 const rot = (v, a) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
 const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 const mul = (v, k) => ({ x: v.x * k, y: v.y * k });
 const len = (v) => Math.hypot(v.x, v.y);
-
 /** IK hai đoạn xương. prefer(candidate) -> điểm số, chọn nghiệm khuỷu/đầu gối có điểm cao hơn. */
-export function ik2(S, T, l1, l2, prefer) {
+export function ik2(S, T, l1, l2, prefer, minD = 0, prevMid = null, margin = 0, maxD = Infinity) {
   const dx = T.x - S.x, dy = T.y - S.y, d = Math.hypot(dx, dy) || 1e-6;
-  const dd = Math.min(l1 + l2 - 0.01, Math.max(Math.abs(l1 - l2) + 0.01, d));
+  // minD / maxD: giới hạn khoảng cách vai->cổ tay (hông->mắt cá) = giới hạn độ gập và độ duỗi thẳng của khuỷu / đầu gối.
+  // (duỗi thẳng hoàn toàn là điểm kỳ dị: khuỷu giật mạnh dù tay chỉ nhích 1px -> luôn chừa một chút cong)
+  const dd = Math.min(l1 + l2 - 0.01, maxD, Math.max(Math.abs(l1 - l2) + 0.01, minD, d));
   const ux = dx / d, uy = dy / d;
   const a = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd);
   const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
   const mx = S.x + ux * a, my = S.y + uy * a;
   const c1 = { x: mx - uy * h, y: my + ux * h }, c2 = { x: mx + uy * h, y: my - ux * h };
-  const mid = prefer(c1) >= prefer(c2) ? c1 : c2;
+  let mid = prefer(c1) >= prefer(c2) ? c1 : c2;
+  if (prevMid) {                                   // quán tính: giữ nguyên nghiệm của frame trước, trừ khi nghiệm kia hơn hẳn
+    const cur = Math.hypot(c1.x - prevMid.x, c1.y - prevMid.y) <= Math.hypot(c2.x - prevMid.x, c2.y - prevMid.y) ? c1 : c2;
+    const oth = cur === c1 ? c2 : c1;
+    mid = prefer(oth) - prefer(cur) > margin ? oth : cur;
+  }
   return { mid, end: { x: S.x + ux * dd, y: S.y + uy * dd }, reach: l1 + l2 };
 }
-
 /** Ma trận affine đưa đoạn (restA->restB) lên (curA->curB), có hệ số co giãn s. */
 export function boneXf(restA, restB, curA, curB, s) {
   const th = Math.atan2(curB.y - curA.y, curB.x - curA.x) - Math.atan2(restB.y - restA.y, restB.x - restA.x);
@@ -33,7 +37,6 @@ export function pivotXf(restPivot, curPivot, th, s) {
   return { a: c, b: sn, c: -sn, d: c, e: curPivot.x - (c * restPivot.x - sn * restPivot.y), f: curPivot.y - (sn * restPivot.x + c * restPivot.y) };
 }
 export const applyXf = (m, p) => ({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f });
-
 /**
  * params:
  *  scale   : px sân khấu / px texture
@@ -43,6 +46,14 @@ export const applyXf = (m, p) => ({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x
  *  targets : { wristR, wristL, ankleR, ankleL } toạ độ sân khấu (null = giữ tư thế T gập tự nhiên)
  *  rest    : { wristR:{x,y}...} tư thế nghỉ tương đối so với vai/hông (nếu không có target) – đơn vị texture
  */
+/** Khớp vai thực sự = tâm "đầu tròn" của tay (lệch vào trong so với mép tay một bán kính). Xoay quanh đây thì đầu tay
+ *  đứng nguyên tại chỗ như được ghim đinh, thay vì bị văng ra khỏi thân. */
+export const SHOULDER_INSET = 0.85;
+export function restShoulderPivot(rig, side) {
+  const a = rig.joints["shoulder" + side], e = rig.joints["elbow" + side];
+  const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy) || 1, k = SHOULDER_INSET * (rig.widths?.arm || 0);
+  return { x: a.x + dx / d * k, y: a.y + dy / d * k };
+}
 export function solvePose(rig, params) {
   const R = rig.joints, s = params.scale, lean = params.lean || 0;
   const H0 = R.hip, root = params.root;
@@ -61,26 +72,42 @@ export function solvePose(rig, params) {
   J.neck = add(J.neck, bob);
   J.head = add(J.neck, headOff);
   const headXf = pivotXf(R.neck, J.neck, headAng, s);
-
-  const limb = (S, mid0, end0, restS, target, prefer) => {
+  const RsR = restShoulderPivot(rig, "R"), RsL = restShoulderPivot(rig, "L");    // khớp vai dùng để xoay
+  const SR = T(RsR), SL = T(RsL);
+  const LIM = { armMinReach: 0.86, armMaxReach: 0.98, legMinReach: 0.6, legMaxReach: 0.99, maxAbd: 0.5, minAbd: -0.2, armOut: 0.8, hysteresis: 0.3, ...(params.limits || {}) };
+  const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+  const limb = (S, mid0, end0, restS, target, prefer, opt = {}) => {
     const l1 = len(sub(mid0, restS)) * s, l2 = len(sub(end0, mid0)) * s;
     const tgt = target || add(S, mul(rot(sub(end0, restS), lean), s));
-    return ik2(S, tgt, l1, l2, prefer);
+    const r = ik2(S, tgt, l1, l2, prefer, target ? (opt.minReach || 0) * (l1 + l2) : 0, target ? opt.prev : null, LIM.hysteresis * l1, target ? (opt.maxReach || 1) * (l1 + l2) : Infinity);
+    // Giới hạn dạng háng: đùi không được xoè ra ngoài quá maxAbd (rad) so với trục thân -> hết cảm giác "bẻ háng".
+    if (target && opt.out) {
+      const v = rot(sub(r.mid, S), -lean);                       // đùi trong hệ toạ độ thân
+      const phi = Math.atan2(opt.out * v.x, v.y);                // góc lệch khỏi phương thẳng đứng, dương = ra ngoài
+      if (phi > LIM.maxAbd || phi < LIM.minAbd) {
+        const pc = clampN(phi, LIM.minAbd, LIM.maxAbd);
+        const mid = add(S, mul(rot({ x: opt.out * Math.sin(pc), y: Math.cos(pc) }, lean), l1));
+        const dv = sub(tgt, mid), dl = len(dv) || 1;
+        return { mid, end: add(mid, mul(dv, l2 / dl)), reach: r.reach };   // cẳng chân hướng về mục tiêu
+      }
+    }
+    return r;
   };
-  const armPref = (c) => c.y;                       // khuỷu hướng xuống
-  const legPrefR = (c) => -c.x, legPrefL = (c) => c.x; // đầu gối hướng ra ngoài
-  const aR = limb(J.shoulderR, R.elbowR, R.wristR, R.shoulderR, params.targets?.wristR, armPref);
-  const aL = limb(J.shoulderL, R.elbowL, R.wristL, R.shoulderL, params.targets?.wristL, armPref);
-  const lR = limb(J.hipR, R.kneeR, R.ankleR, R.hipR, params.targets?.ankleR, legPrefR);
-  const lL = limb(J.hipL, R.kneeL, R.ankleL, R.hipL, params.targets?.ankleL, legPrefL);
+  // khuỷu ưu tiên hướng xuống VÀ ra ngoài thân (không gập vào trong ngực rồi bàn tay chĩa ra)
+  const armPrefR = (c) => c.y - LIM.armOut * (c.x - SR.x);
+  const armPrefL = (c) => c.y + LIM.armOut * (c.x - SL.x);
+  const legPrefR = (c) => -c.x, legPrefL = (c) => c.x;           // đầu gối hướng ra ngoài
+  const aR = limb(SR, R.elbowR, R.wristR, RsR, params.targets?.wristR, armPrefR, { minReach: LIM.armMinReach, maxReach: LIM.armMaxReach, prev: params.prev?.elbowR });
+  const aL = limb(SL, R.elbowL, R.wristL, RsL, params.targets?.wristL, armPrefL, { minReach: LIM.armMinReach, maxReach: LIM.armMaxReach, prev: params.prev?.elbowL });
+  const lR = limb(J.hipR, R.kneeR, R.ankleR, R.hipR, params.targets?.ankleR, legPrefR, { minReach: LIM.legMinReach, maxReach: LIM.legMaxReach, out: -1, prev: params.prev?.kneeR });
+  const lL = limb(J.hipL, R.kneeL, R.ankleL, R.hipL, params.targets?.ankleL, legPrefL, { minReach: LIM.legMinReach, maxReach: LIM.legMaxReach, out: 1, prev: params.prev?.kneeL });
   J.elbowR = aR.mid; J.wristR = aR.end; J.elbowL = aL.mid; J.wristL = aL.end;
   J.kneeR = lR.mid; J.ankleR = lR.end; J.kneeL = lL.mid; J.ankleL = lL.end;
-
   const xf = {
     torso, head: headXf,
-    upperArmR: boneXf(R.shoulderR, R.elbowR, J.shoulderR, J.elbowR, s),
+    upperArmR: boneXf(RsR, R.elbowR, SR, J.elbowR, s),
     foreArmR: boneXf(R.elbowR, R.wristR, J.elbowR, J.wristR, s),
-    upperArmL: boneXf(R.shoulderL, R.elbowL, J.shoulderL, J.elbowL, s),
+    upperArmL: boneXf(RsL, R.elbowL, SL, J.elbowL, s),
     foreArmL: boneXf(R.elbowL, R.wristL, J.elbowL, J.wristL, s),
     thighR: boneXf(R.hipR, R.kneeR, J.hipR, J.kneeR, s),
     shinR: boneXf(R.kneeR, R.ankleR, J.kneeR, J.ankleR, s),
@@ -89,7 +116,6 @@ export function solvePose(rig, params) {
   };
   return { scale: s, lean, joints: J, xf, reach: { armR: aR.reach, armL: aL.reach, legR: lR.reach, legL: lL.reach } };
 }
-
 /**
  * Vị trí một món đồ cầm tay (vợt / vũ khí / khiên).
  * Quy ước sprite: tay cầm = spec.grip, phần đánh hướng LÊN. Nó xoay theo hướng cẳng tay (khuỷu -> cổ tay).

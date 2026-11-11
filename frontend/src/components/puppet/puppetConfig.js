@@ -46,17 +46,28 @@ export const FINGERS = {
   ring:   { tip: 16, base: 13 },
   pinky:  { tip: 20, base: 17 },
 };
-// ngón giữa = đầu | ngón trỏ = tay phải | ngón áp út = tay trái | ngón út = chân trái | ngón cái = chân phải
+// MAPPING NGÓN TAY -> BỘ PHẬN CON RỐI (đổi ở đây là đổi toàn bộ game, không cần sửa chỗ khác):
+//   mỗi ngón điều khiển ĐÚNG MỘT bộ phận:  "head" | "armR" | "armL" | "legR" | "legL"
+//   "R"/"L" là bên của CON RỐI nhìn từ khán giả: R nằm bên TRÁI màn hình, L nằm bên PHẢI màn hình.
+// Hiện tại: ngón cái = tay cầm vợt | ngón út = tay cầm vũ khí | ngón trỏ + ngón áp út = hai chân | ngón giữa = đầu
 export const LIMB_BY_FINGER = {
   middle: "head",
-  index: "armR",
-  ring: "armL",
-  pinky: "legL",
-  thumb: "legR",
+  thumb: "armL",     // tay cầm vợt (xem HAND_ROLES)
+  pinky: "armR",     // tay cầm vũ khí
+  index: "legR",
+  ring: "legL",
 };
-// Vai trò của hai tay (theo mục "Lưu ý" trong đề bài): tay phải (ngón trỏ) cầm vợt, tay trái (ngón áp út) cầm vũ khí.
-// Muốn đảo lại (tay trái cầm vợt): đổi thành { armL: "racket", armR: "weapon" }.
+// Tay nào cầm gì: armL (bên phải màn hình, gần bàn) cầm vợt, armR cầm vũ khí.
 export const HAND_ROLES = { armL: "racket", armR: "weapon" };
+
+// Ngón ngắn (cái, út) di chuyển ít hơn ngón dài nên cần khuếch đại thêm để tay con rối với tới được.
+export const FINGER_GAIN = { thumb: 1.9, index: 1, middle: 1, ring: 1, pinky: 1.35 };
+
+// Suy ra tự động từ hai bảng trên (đừng sửa):
+export const fingerOfLimb = (limb) => Object.keys(LIMB_BY_FINGER).find((f) => LIMB_BY_FINGER[f] === limb);
+export const armWithRole = (role) => Object.keys(HAND_ROLES).find((a) => HAND_ROLES[a] === role);
+export const WEAPON_FINGER = fingerOfLimb(armWithRole("weapon"));   // ngón cầm vũ khí -> dùng để nhận cú vung
+export const RACKET_FINGER = fingerOfLimb(armWithRole("racket"));
 
 export const TRACKING = {
   WASM_URL: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
@@ -69,7 +80,9 @@ export const TRACKING = {
   JUMP_PER_UNIT: 520,      // nâng bàn tay lên thì con rối nhảy (px sân khấu / đơn vị khung hình)
   JUMP_MAX: 150,
   FINGER_REACH: 2.5,       // ngón duỗi thẳng ~ 2.5 lần kích thước bàn tay
-  SWING_SPEED: 9,          // tốc độ ngón (đơn vị bàn tay / giây) để tính là một cú vung
+  SWING_SPEED: 6.5,        // CÚ GẠT NHANH: tốc độ đầu ngón (đơn vị bàn tay / giây)
+  SWEEP_DIST: 0.2,         // CÚ QUÉT CHẬM: bàn tay đi sang phải ít nhất ngần này bề rộng khung hình...
+  SWEEP_MS: 700,           // ...trong khoảng thời gian này
   SWING_MIN_DIR_X: 0.55,   // phải vung sang PHẢI (trên màn hình đã lật gương)
   SWING_COOLDOWN_MS: 650,
 };
@@ -90,9 +103,9 @@ export const PHYSICS = {
 
 export const RULES = {
   LIVES: 3,
-  MATCH_POINT: 1,          // user đạt số điểm này -> kích hoạt cao trào
-  ENERGY_PER_RETURN: 13,
-  ENERGY_FAST_BONUS: 7,
+  MATCH_POINT: 5,          // user đạt số điểm này -> kích hoạt cao trào
+  ENERGY_PER_RETURN: 18,
+  ENERGY_FAST_BONUS: 8,
   ENERGY_MAX: 100,
   SERVE_DELAY: 1.1,
   COUNTDOWN: 3,
@@ -110,7 +123,7 @@ export const AI = {
 export const FINISHER = {
   JUMP_HEIGHT: 300,
   INTRO: 1.5,                  // giây: con rối bật nhảy, quả cầu dừng lơ lửng
-  WINDOW: 5.5,                 // giây người chơi phải vung tay
+  WINDOW: 7,                   // giây người chơi phải vung tay
   GUARD_SWITCH: 0.62,          // AI đổi tư thế khiên mỗi ... giây (CAO / GIỮA / THẤP)
   BLOCK_TOLERANCE: 0,          // 0 = chỉ đỡ khi trùng tầng
 };

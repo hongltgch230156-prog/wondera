@@ -99,13 +99,13 @@ export const EQUIPMENT = {
         <ellipse cx="44" cy="90" rx="14" ry="8" fill="#fff" opacity=".18" transform="rotate(-35 44 90)"/>`) },
   ],
   weapon: [
-    { id: "sword", name: "Sword", grip: [60, 286], tip: [60, 22], size: 1.0,
+    { id: "sword", name: "Sword", grip: [60, 252], tip: [60, 22], size: 1.0,
       svg: wrap(`<path d="M60 12 L72 40 L72 206 L48 206 L48 40 Z" fill="#dfe6ee" stroke="#4a5568" stroke-width="5"/>
         <path d="M60 22 V200" stroke="#fff" stroke-width="3" opacity=".7"/>
         <rect x="26" y="204" width="68" height="14" rx="6" fill="#d9a441" stroke="#6b4a10" stroke-width="4"/>
         <rect x="52" y="218" width="16" height="64" rx="6" fill="#7a2f2f" stroke="#3a1414" stroke-width="4"/>
         <circle cx="60" cy="286" r="9" fill="#d9a441" stroke="#6b4a10" stroke-width="4"/>`) },
-    { id: "dagger", name: "Dagger", grip: [60, 288], tip: [60, 120], size: 0.8,
+    { id: "dagger", name: "Dagger", grip: [60, 250], tip: [60, 120], size: 0.8,
       svg: wrap(`<path d="M60 112 L72 138 L70 214 L50 214 L48 138 Z" fill="#e6ebf2" stroke="#4a5568" stroke-width="5"/>
         <rect x="38" y="212" width="44" height="12" rx="5" fill="#a74b4b" stroke="#4a1c1c" stroke-width="4"/>
         <rect x="53" y="224" width="14" height="52" rx="6" fill="#3b2a24" stroke="#150e0c" stroke-width="4"/>

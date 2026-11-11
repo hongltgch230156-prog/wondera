@@ -1,7 +1,7 @@
 // frontend/src/components/puppet/puppetStage.js
 // ĐIỀU PHỐI Puppet Stage: nối giao diện (tab) + camera/bàn tay + engine luật chơi + renderer.
 // Handlab gọi: initPuppetStage() (một lần), startPuppetStage() khi vào tab, stopPuppetStage() khi rời tab / đóng Hand Lab.
-import { LAYOUT as L, TRACKING, HAND_ROLES } from "./puppetConfig.js";
+import { LAYOUT as L, TRACKING, HAND_ROLES, LIMB_BY_FINGER, FINGER_GAIN, FINGERS, fingerOfLimb, armWithRole, WEAPON_FINGER } from "./puppetConfig.js";
 import { PRESET_PUPPETS, AI_PUPPET, EQUIPMENT, BALLS, svgUrl, loadImage, findBall, findEquipment } from "./puppetAssets.js";
 import { packageFromImage, listSaved, savePackage, removeSaved, restorePackage } from "./puppetStore.js";
 import { createUploader } from "./puppetUploader.js";
@@ -37,6 +37,21 @@ const S = {
 /* ================================================================== */
 /*  KHỞI TẠO                                                           */
 /* ================================================================== */
+
+// Bộ lọc One-Euro: đứng yên -> mượt, vung nhanh -> bám sát
+function smoothTarget(store, key, p, dt) {
+  const d = Math.min(0.1, Math.max(dt, 1 / 120));
+  const lp = (a, prev, x) => prev + a * (x - prev);
+  const alpha = (fc) => 1 / (1 + 1 / (2 * Math.PI * fc * d));
+  const st = store[key];
+  if (!st) { store[key] = { x: p.x, y: p.y, rx: p.x, ry: p.y, dx: 0, dy: 0 }; return { x: p.x, y: p.y }; }
+  st.dx = lp(alpha(1), st.dx, (p.x - st.rx) / d); st.dy = lp(alpha(1), st.dy, (p.y - st.ry) / d);
+  st.rx = p.x; st.ry = p.y;
+  const a = alpha(1.6 + 0.008 * Math.hypot(st.dx, st.dy));
+  st.x = lp(a, st.x, p.x); st.y = lp(a, st.y, p.y);
+  return { x: st.x, y: st.y };
+}
+
 export function initPuppetStage() {
   if (S.initPromise) return S.initPromise;
   S.initPromise = (async () => {
@@ -50,6 +65,19 @@ export function initPuppetStage() {
       puppetTiles: q("#ps-sel-puppet .ps-tiles"), equipTiles: q("#ps-sel-equip .ps-tiles"), ballTiles: q("#ps-sel-ball .ps-tiles"),
       puppetName: q("#ps-puppet-name"), ballName: q("#ps-ball-name"), seg: q("#ps-sel-equip .ps-seg"),
     };
+    // thanh "SWING" (hiện ở giai đoạn kết liễu) và danh sách luật chơi trên màn chờ – tạo bằng JS nên không phải sửa index.html
+    S.dom.swing = document.createElement("div");
+    S.dom.swing.className = "ps-swing"; S.dom.swing.hidden = true;
+    S.dom.swing.innerHTML = `<span>${WEAPON_FINGER.toUpperCase()} SWING</span><div class="ps-swing-bar"><i></i></div>`;
+    S.dom.hud.appendChild(S.dom.swing); S.dom.swingFill = S.dom.swing.querySelector("i");
+    const rules = document.createElement("ul");
+    rules.className = "ps-ov-rules";
+    rules.innerHTML = [
+      "Hit the ball back with your <b>racket</b> – every good return charges <b>POWER</b>.",
+      "When POWER is full (or you reach <b>match point</b>) your puppet leaps and the ball freezes in the air.",
+      `Then flick or sweep your <b>${WEAPON_FINGER}</b> finger <b>left → right</b>. Strike where the AI’s shield is <b>not</b> to win!`,
+    ].map((t) => `<li>${t}</li>`).join("");
+    S.dom.ovText.after(rules);
     S.renderer = new StageRenderer(S.dom.canvas);
     S.engine = new RallyEngine(onEvent);
     S.driver = new HandDriver({ video: S.dom.video, overlay: S.dom.camOverlay, onStatus: setStatus });
@@ -223,8 +251,10 @@ function startGame() {
   S.dom.tip.textContent = S.driver.mode === "sim" ? "Mouse mode: move the mouse, Space = swing, keys 1-5 fold a finger" : "Move your hand – each finger pulls one of the puppet’s limbs";
   updateHud(true);
 }
-function showOverlay(title, text, btn) {
-  S.dom.ovTitle.textContent = title; S.dom.ovText.textContent = text; S.dom.ovBtn.textContent = btn; S.dom.overlay.hidden = false;
+function showOverlay(title, text, btn, mode = "idle") {
+  S.dom.ovTitle.textContent = title; S.dom.ovText.textContent = text; S.dom.ovBtn.textContent = btn;
+  S.dom.overlay.dataset.mode = mode;                 // "idle" hiện luật chơi, "result" thì ẩn
+  S.dom.overlay.hidden = false;
 }
 function setLive(state, text) { S.dom.live.dataset.state = state; S.dom.live.querySelector("b").textContent = text; }
 function setStatus(text, level) {
@@ -246,17 +276,17 @@ function onEvent(type, d) {
     case "aiReturn": fx.hit(d.x, d.y, 0.6, "#ffd0a0"); break;
     case "bounce": fx.bounce(d.x, d.y); break;
     case "point": say(d.who === "user" ? "POINT!" : "MISS!", 1.2); S.dom.tip.textContent = d.reason; updateHud(true); break;
-    case "climax": say("POWER FULL!", 1.4); break;
-    case "finisherStart": say("SWING NOW!  →", 99); S.dom.guard.hidden = false; S.dom.tip.textContent = "Swing your ring finger across the shield’s open side – up, across or down."; paintGuard(S.engine.ai.guard); break;
+    case "climax": say(d.reason === "match" ? "MATCH POINT!" : "POWER FULL!", 1.4); break;
+    case "finisherStart": say("SWING NOW!  →", 99); S.dom.guard.hidden = false; S.dom.tip.textContent = `Flick or sweep your ${WEAPON_FINGER.toUpperCase()} finger LEFT → RIGHT. Aim up / across / down – strike where the shield is NOT.`; S.dom.swing.hidden = false; paintGuard(S.engine.ai.guard); break;
     case "guard": paintGuard(d.guard); break;
-    case "strike": say(d.blocked ? "…" : "STRIKE!", 0.6); break;
+    case "strike": say(d.blocked ? "…" : "STRIKE!", 0.6); S.dom.swing.hidden = true; break;
     case "blocked": say("BLOCKED!", 1.2); S.knock = { t: 0 }; fx.hit(S.engine.ai.shieldX, S.engine.ai.shieldY, 1, "#ffe08a"); break;
     case "shatter": say("K.O.!", 1.4); { const a = S.engine.ai; fx.shards(L.AI_X + a.knockX, 700, 150, 320, ["#c9a46a", "#7b3d2c", "#e8dccb", "#2a1a14"]); } break;
-    case "fizzle": say("TOO SLOW…", 1.2); S.dom.guard.hidden = true; S.dom.tip.textContent = "Keep rallying to charge the power bar again"; break;
+    case "fizzle": say("TOO SLOW…", 1.2); S.dom.guard.hidden = true; S.dom.swing.hidden = true; S.dom.tip.textContent = "Keep rallying to charge the power bar again"; break;
     case "result":
-      S.dom.guard.hidden = true; S.dom.tip.textContent = "";
+      S.dom.guard.hidden = true; S.dom.swing.hidden = true; S.dom.tip.textContent = "";
       if (d.kind === "win") fx.confetti(1484, 1060, ["#ffd34d", "#e9895f", "#8a78c0", "#6fae8a", "#f59fc0"]);
-      showOverlay(d.kind === "win" ? "YOU WIN!" : "GAME OVER", d.reason + ` · Score ${d.score.user}–${d.score.ai}`, "PLAY AGAIN");
+      showOverlay(d.kind === "win" ? "YOU WIN!" : "GAME OVER", d.reason + ` · Score ${d.score.user}–${d.score.ai}`, "PLAY AGAIN", "result");
       break;
     default: break;
   }
@@ -295,6 +325,7 @@ function frame(now) {
     if (S.knock) S.knock.t += dt;
   }
   updateHud(false);
+  if (!S.dom.swing.hidden) S.dom.swingFill.style.width = Math.round(clamp(h.swingLevel, 0, 1) * 100) + "%";
   if (S.banner.until && S.t > S.banner.until) S.banner.until = 0;
   S.dom.bannerEl.textContent = S.banner.until ? S.banner.text : "";
   S.dom.bannerEl.classList.toggle("is-on", !!S.banner.until);
@@ -330,26 +361,47 @@ function buildUser(h, dt) {
   const lean = present ? clamp(h.roll * 0.9, -0.5, 0.5) : Math.sin(S.t * 1.3) * 0.03;
   const base = solvePose(rig, { scale: s, root, lean });
   const J = base.joints, vec = present ? h.vec : V0;
+  // Mỗi ngón điều khiển bộ phận nào do LIMB_BY_FINGER (puppetConfig.js) quyết định.
   const gain = (r) => (r / TRACKING.FINGER_REACH) * 1.5;
-  const rR = base.reach.armR, rL = base.reach.armL, lg = base.reach.legR;
-  const targets = {
-    wristR: { x: J.shoulderR.x + 0.55 * rR + (vec.index.x - V0.index.x) * gain(rR), y: J.shoulderR.y + 0.25 * rR + (vec.index.y - V0.index.y) * gain(rR) },
-    wristL: { x: J.shoulderL.x + 0.45 * rL + (vec.ring.x - V0.ring.x) * gain(rL), y: J.shoulderL.y - 0.15 * rL + (vec.ring.y - V0.ring.y) * gain(rL) },
-    ankleR: { x: J.hipR.x - 0.1 * lg + (vec.thumb.x - V0.thumb.x) * 0.22 * lg, y: J.hipR.y + 0.97 * lg + (vec.thumb.y - V0.thumb.y) * 0.18 * lg },
-    ankleL: { x: J.hipL.x + 0.1 * lg + (vec.pinky.x - V0.pinky.x) * 0.22 * lg, y: J.hipL.y + 0.97 * lg + (vec.pinky.y - V0.pinky.y) * 0.18 * lg },
-  };
-  if (eng.user.strikeT >= 0 && ph === "strike") {                    // cú chém trên không
-    const p = ease(eng.user.strikeT), hgt = eng.user.strikeHeight;
-    const end = [{ x: 2.0, y: -0.6 }, { x: 2.1, y: 0.2 }, { x: 1.9, y: 0.95 }][hgt];
-    targets.wristL = { x: J.shoulderL.x + lerp(-0.4, end.x, p) * rL, y: J.shoulderL.y + lerp(-1.3, end.y, p) * rL - Math.sin(Math.PI * p) * 0.25 * rL };
+  const rArm = { armR: base.reach.armR, armL: base.reach.armL }, lg = base.reach.legR;
+  const sh = { armR: J.shoulderR, armL: J.shoulderL }, hp = { legR: J.hipR, legL: J.hipL };
+  const targets = {};
+  for (const [finger, limb] of Object.entries(LIMB_BY_FINGER)) {
+    if (limb === "head") continue;
+    const v = vec[finger], v0 = V0[finger], g = FINGER_GAIN[finger] || 1;
+    if (limb.startsWith("arm")) {
+      const role = HAND_ROLES[limb], out = limb === "armR" ? -1 : 1,
+        neutral = role === "racket" ? { x: 0.74 * out, y: 0.16 } : { x: 0.5 * out, y: -0.6 };
+      targets["wrist" + limb.slice(3)] = { x: sh[limb].x + neutral.x * rArm[limb] + (v.x - v0.x) * gain(rArm[limb]) * g, y: sh[limb].y + neutral.y * rArm[limb] + (v.y - v0.y) * gain(rArm[limb]) * g };
+    } else {
+      const side = limb === "legR" ? -0.1 : 0.1;
+      targets["ankle" + limb.slice(3)] = { x: hp[limb].x + side * lg + (v.x - v0.x) * 0.22 * lg * g, y: hp[limb].y + 0.97 * lg + (v.y - v0.y) * 0.18 * lg * g };
+    }
   }
-  const mid = vec.middle;
+  if (eng.user.strikeT >= 0 && ph === "strike") {                    // cú chém trên không (bằng tay cầm vũ khí)
+    const wArm = armWithRole("weapon"), p = ease(eng.user.strikeT), hgt = eng.user.strikeHeight, r = rArm[wArm];
+    const end = [{ x: 2.0, y: -0.6 }, { x: 2.1, y: 0.2 }, { x: 1.9, y: 0.95 }][hgt];
+    targets["wrist" + wArm.slice(3)] = { x: sh[wArm].x + lerp(-0.4, end.x, p) * r, y: sh[wArm].y + lerp(-1.3, end.y, p) * r - Math.sin(Math.PI * p) * 0.25 * r };
+  }
+
+  // làm mượt mục tiêu theo vị trí TƯƠNG ĐỐI so với vai/hông (để tay không bị tụt lại khi thân di chuyển)
+  S.tgtF = S.tgtF || {};
+  const anchor = { wristR: J.shoulderR, wristL: J.shoulderL, ankleR: J.hipR, ankleL: J.hipL };
+  for (const k of Object.keys(targets)) {
+    if (ph === "strike") { delete S.tgtF[k]; continue; }          // lúc chém giữ nguyên, không trễ
+    const a = anchor[k], q = smoothTarget(S.tgtF, k, { x: targets[k].x - a.x, y: targets[k].y - a.y }, dt);
+    targets[k] = { x: a.x + q.x, y: a.y + q.y };
+  }
+
+  const mid = vec[fingerOfLimb("head")] || vec.middle;
   const pose = solvePose(rig, {
     scale: s, root, lean,
     headTilt: present ? clamp(mid.x * 0.25, -0.45, 0.45) : 0,
     headBob: present ? clamp((-mid.y - 2.4) * 10, -12, 12) : 0,
     targets,
+    prev: S.prevJ,
   });
+  S.prevJ = pose.joints;
 
   // --- vợt / vũ khí ---
   const equip = [], racketArm = Object.keys(HAND_ROLES).find((a) => HAND_ROLES[a] === "racket");
@@ -393,13 +445,10 @@ function buildAi(dt) {
 function handShadow(h, pose) {
   if (!h.present && h.mode !== "sim") return null;
   const U = 78, cx = S.userX + 70, cy = 210, pts = h.lm.map((p) => ({ x: cx + (p.x - h.palm.x) / h.hs * U, y: cy + (p.y - h.palm.y) / h.hs * U }));
-  const J = pose.joints, tip = (i) => pts[i];
+  const J = pose.joints, joint = { head: J.head, armR: J.wristR, armL: J.wristL, legR: J.ankleR, legL: J.ankleL };
   return {
     hand: { pts, unit: U * 0.5, alpha: 1 },
-    strings: [
-      { from: tip(12), to: J.head }, { from: tip(8), to: J.wristR }, { from: tip(16), to: J.wristL },
-      { from: tip(4), to: J.ankleR }, { from: tip(20), to: J.ankleL },
-    ],
+    strings: Object.entries(LIMB_BY_FINGER).map(([finger, limb]) => ({ from: pts[FINGERS[finger].tip], to: joint[limb] })),
   };
 }
 
