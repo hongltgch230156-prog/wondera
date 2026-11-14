@@ -19,7 +19,7 @@ const limiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Bạn thử quá nhiều lần, vui lòng đợi vài phút rồi thử lại.' },
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 const signToken = (user) =>
@@ -55,16 +55,16 @@ router.post('/register', limiter, async (req, res) => {
 
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email không hợp lệ.' });
     if (password.length < MIN_PASSWORD)
-      return res.status(400).json({ error: `Mật khẩu cần ít nhất ${MIN_PASSWORD} ký tự.` });
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters long.` });
     if (password.length > 72)
-      return res.status(400).json({ error: 'Mật khẩu quá dài (tối đa 72 ký tự).' });
+      return res.status(400).json({ error: 'Password is too long (maximum 72 characters).' });
 
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({
         error: existing.googleId && !existing.password
-          ? 'Email này đã đăng ký bằng Google, hãy bấm "Tiếp tục với Google".'
-          : 'Email này đã được đăng ký. Hãy đăng nhập nhé.',
+          ? 'This email is already registered with Google. Please click "Continue with Google".'
+          : 'This email is already registered. Please log in instead.',
       });
     }
 
@@ -76,9 +76,9 @@ router.post('/register', limiter, async (req, res) => {
 
     res.status(201).json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'Email này đã được đăng ký.' });
+    if (err.code === 11000) return res.status(409).json({ error: 'This email is already registered.' });
     console.error('[auth/register]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Server error, please try again later.' });
   }
 });
 
@@ -88,21 +88,21 @@ router.post('/login', limiter, async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
     if (!EMAIL_RE.test(email) || !password)
-      return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' });
+      return res.status(400).json({ error: 'Please enter your email and password.' });
 
     const user = await User.findOne({ email }).select('+password');
     const ok = await bcrypt.compare(password, user?.password || DUMMY_HASH);
 
     if (!user || !user.password || !ok) {
       if (user && !user.password && user.googleId)
-        return res.status(401).json({ error: 'Tài khoản này đăng nhập bằng Google. Hãy bấm "Tiếp tục với Google".' });
-      return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' });
+        return res.status(401).json({ error: 'This account is registered with Google. Please click "Continue with Google".' });
+      return res.status(401).json({ error: 'Email or password is incorrect.' });
     }
 
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
     console.error('[auth/login]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Server error, please try again later.' });
   }
 });
 
@@ -112,7 +112,7 @@ router.post('/login', limiter, async (req, res) => {
 router.post('/google', limiter, async (req, res) => {
   try {
     const accessToken = String(req.body.accessToken || '');
-    if (!accessToken) return res.status(400).json({ error: 'Thiếu token Google.' });
+    if (!accessToken) return res.status(400).json({ error: 'Missing Google token.' });
     if (!process.env.GOOGLE_CLIENT_ID)
       return res.status(500).json({ error: 'Server chưa cấu hình GOOGLE_CLIENT_ID.' });
 
@@ -120,19 +120,19 @@ router.post('/google', limiter, async (req, res) => {
     const infoRes = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
     );
-    if (!infoRes.ok) return res.status(401).json({ error: 'Token Google không hợp lệ.' });
+    if (!infoRes.ok) return res.status(401).json({ error: 'Invalid Google token.' });
     const tokenInfo = await infoRes.json();
     if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID)
-      return res.status(401).json({ error: 'Token Google không thuộc ứng dụng này.' });
+      return res.status(401).json({ error: 'Token Google does not belong to this application.' });
 
     // 2) Lấy thông tin tài khoản
     const profRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!profRes.ok) return res.status(401).json({ error: 'Không lấy được thông tin từ Google.' });
+    if (!profRes.ok) return res.status(401).json({ error: 'Failed to fetch Google profile information.' });
     const profile = await profRes.json();
     if (!profile.email || !profile.email_verified)
-      return res.status(401).json({ error: 'Email Google chưa được xác minh.' });
+      return res.status(401).json({ error: 'Google email is not verified.' });
 
     const email = profile.email.toLowerCase();
     let user = await User.findOne({ $or: [{ googleId: profile.sub }, { email }] });
@@ -151,7 +151,7 @@ router.post('/google', limiter, async (req, res) => {
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
     console.error('[auth/google]', err);
-    res.status(500).json({ error: 'Đăng nhập Google thất bại, vui lòng thử lại.' });
+    res.status(500).json({ error: 'Google login failed, please try again.' });
   }
 });
 
@@ -164,12 +164,12 @@ router.get('/me', requireAuth, (req, res) => {
 router.patch('/me', requireAuth, async (req, res) => {
   try {
     const name = String(req.body?.name ?? '').trim().slice(0, 40);
-    if (!name) return res.status(400).json({ error: 'Tên không được để trống.' });
+    if (!name) return res.status(400).json({ error: 'Name cannot be empty.' });
     const user = await User.findByIdAndUpdate(req.user._id, { name }, { new: true });
     res.json({ user: publicUser(user) });
   } catch (err) {
     console.error('[auth/patch-me]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Server error, please try again later.' });
   }
 });
 
@@ -177,13 +177,13 @@ router.patch('/me', requireAuth, async (req, res) => {
 router.post('/forgot-password', forgotLimiter, async (req, res) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
-    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email không hợp lệ.' });
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email is invalid.' });
 
     const user = await User.findOne({ email }).select('+resetSentAt');
     if (!user) {
       return res.status(404).json({
         code: 'EMAIL_NOT_FOUND',
-        error: 'Email này chưa được đăng ký. Hãy đăng ký tài khoản mới hoặc dùng email khác.',
+        error: 'This email is not registered. Please sign up or use a different email.',
       });
     }
 
@@ -199,16 +199,16 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
       await user.save();
       sendResetCode(email, code).catch((err) => console.error('[auth/forgot-mail]', err.message));
     }
-    res.json({ message: 'Mã xác nhận đã được gửi tới email của bạn. Mã có hiệu lực 10 phút.' });
+    res.json({ message: 'Verification code has been sent to your email. It will expire in 10 minutes.' });
   } catch (err) {
     console.error('[auth/forgot-password]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Server error, please try again later.' });
   }
 });
 
 /* ----------------------------- Quên mật khẩu: đặt mật khẩu mới ----------------------------- */
 router.post('/reset-password', limiter, async (req, res) => {
-  const BAD = { error: 'Mã không đúng hoặc đã hết hạn.' };
+  const BAD = { error: 'Verification code is incorrect or has expired.' };
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const code = String(req.body.code || '').trim();
@@ -216,15 +216,15 @@ router.post('/reset-password', limiter, async (req, res) => {
 
     if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json(BAD);
     if (password.length < MIN_PASSWORD)
-      return res.status(400).json({ error: `Mật khẩu cần ít nhất ${MIN_PASSWORD} ký tự.` });
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters long.` });
     if (password.length > 72)
-      return res.status(400).json({ error: 'Mật khẩu quá dài (tối đa 72 ký tự).' });
+      return res.status(400).json({ error: 'Password is too long (maximum 72 characters).' });
 
     const user = await User.findOne({ email }).select('+resetCodeHash +resetCodeExpires +resetAttempts');
     if (!user || !user.resetCodeHash || !user.resetCodeExpires || user.resetCodeExpires < new Date())
       return res.status(400).json(BAD);
     if (user.resetAttempts >= RESET_MAX_ATTEMPTS)
-      return res.status(429).json({ error: 'Bạn đã nhập sai quá nhiều lần, hãy yêu cầu mã mới.' });
+      return res.status(429).json({ error: 'You have entered the wrong code too many times, please request a new code.' });
 
     const ok = crypto.timingSafeEqual(Buffer.from(hashCode(code)), Buffer.from(user.resetCodeHash));
     if (!ok) {
@@ -242,10 +242,10 @@ router.post('/reset-password', limiter, async (req, res) => {
     user.resetSentAt = undefined;
     await user.save();
 
-    res.json({ message: 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.' });
+    res.json({ message: 'Password reset successfully. Please log in with your new password.' });
   } catch (err) {
     console.error('[auth/reset-password]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Server error, please try again later.' });
   }
 });
 

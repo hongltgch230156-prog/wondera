@@ -40,7 +40,7 @@ const toJson = (c) => ({
 
 const serverError = (res, tag, err) => {
   console.error(`[account/${tag}]`, err);
-  res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+  res.status(500).json({ error: 'Server error, please try again later.' });
 };
 
 for (const [segment, type] of Object.entries(SEGMENTS)) {
@@ -74,11 +74,11 @@ for (const [segment, type] of Object.entries(SEGMENTS)) {
   /* ------------------------------ Đổi tên ------------------------------ */
   router.patch(`/${segment}/:id`, async (req, res) => {
     try {
-      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Không tìm thấy.' });
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Item not found.' });
       const name = String(req.body?.name ?? '').trim().slice(0, 60);
-      if (!name) return res.status(400).json({ error: 'Tên không được để trống.' });
+      if (!name) return res.status(400).json({ error: 'Name cannot be empty.' });
       const doc = await Creation.findOne({ _id: req.params.id, user: req.user._id, type, status: 'ready' });
-      if (!doc) return res.status(404).json({ error: 'Không tìm thấy.' });
+      if (!doc) return res.status(404).json({ error: 'Item not found.' });
       doc.name = name;
       await doc.save();
       res.json({ item: toJson(doc) });
@@ -90,9 +90,9 @@ for (const [segment, type] of Object.entries(SEGMENTS)) {
   /* ------------------------------ Xóa ------------------------------ */
   router.delete(`/${segment}/:id`, async (req, res) => {
     try {
-      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Không tìm thấy.' });
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Item not found.' });
       const doc = await Creation.findOne({ _id: req.params.id, user: req.user._id, type });
-      if (!doc) return res.status(404).json({ error: 'Không tìm thấy.' });
+      if (!doc) return res.status(404).json({ error: 'Item not found.' });
       await storage.removeFiles(doc.file, doc.thumb);
       await doc.deleteOne();
       res.status(204).end();
@@ -108,17 +108,17 @@ const handleUpload = (req, res, next) =>
     if (!err) return next();
     const tooBig = err.code === 'LIMIT_FILE_SIZE';
     res.status(tooBig ? 413 : 400).json({
-      error: tooBig ? 'Ảnh quá lớn (tối đa 12MB).' : 'Không đọc được ảnh tải lên.',
+      error: tooBig ? 'Image is too large (maximum 12MB).' : 'Failed to read uploaded image.',
     });
   });
 
 router.post('/exports', handleUpload, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'Thiếu ảnh.' });
+    if (!req.file) return res.status(400).json({ error: 'Image is missing.' });
 
     const count = await Creation.countDocuments({ user: req.user._id, type: 'export' });
     if (count >= MAX_EXPORTS_PER_USER) {
-      return res.status(409).json({ error: `Bạn đã lưu tối đa ${MAX_EXPORTS_PER_USER} ảnh. Hãy xóa bớt ảnh cũ.` });
+      return res.status(409).json({ error: `You have saved the maximum number of images (${MAX_EXPORTS_PER_USER}). Please delete some old images.` });
     }
 
     // Kiểm tra đó thật sự là ảnh (không tin vào mimetype do client gửi)
@@ -126,10 +126,10 @@ router.post('/exports', handleUpload, async (req, res) => {
     try {
       meta = await sharp(req.file.buffer).metadata();
     } catch {
-      return res.status(400).json({ error: 'File không phải ảnh hợp lệ.' });
+      return res.status(400).json({ error: 'File is not a valid image.' });
     }
     const ext = { png: '.png', jpeg: '.jpg', webp: '.webp' }[meta.format];
-    if (!ext) return res.status(400).json({ error: 'Chỉ hỗ trợ ảnh PNG, JPG hoặc WebP.' });
+    if (!ext) return res.status(400).json({ error: 'Only PNG, JPG, and WebP images are supported.' });
 
     const kind = req.body?.kind === 'ai-style' ? 'ai-style' : 'render';
     const file = await storage.saveBuffer('exports', ext, req.file.buffer);

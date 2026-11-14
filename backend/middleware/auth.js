@@ -10,18 +10,18 @@ async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Bạn cần đăng nhập để tiếp tục.' });
+    if (!token) return res.status(401).json({ error: '	You need to log in to continue.' });
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(payload.id).select('email name avatar passwordChangedAt');
-    if (!user) return res.status(401).json({ error: 'Tài khoản không còn tồn tại.' });
+    if (!user) return res.status(401).json({ error: 'Account no longer exists.' });
     if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime())
-      return res.status(401).json({ error: 'Mật khẩu đã thay đổi, vui lòng đăng nhập lại.' });
+      return res.status(401).json({ error: 'Password has been changed, please log in again.' });
 
     req.user = user;
     next();
   } catch {
-    res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.' });
+    res.status(401).json({ error: 'Session has expired, please log in again.' });
   }
 }
 

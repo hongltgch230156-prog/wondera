@@ -39,22 +39,22 @@ router.get('/wallet', async (req, res) => {
     });
   } catch (err) {
     console.error('[payments/wallet]', err);
-    res.status(500).json({ error: 'Không lấy được thông tin ví.' });
+    res.status(500).json({ error: 'Failed to fetch wallet information.' });
   }
 });
 
 router.post('/checkout', async (req, res) => {
   const provider = String(req.body?.provider || '');
   const pkg = getPackage(String(req.body?.packageId || ''));
-  if (!pkg) return res.status(400).json({ error: 'Gói không hợp lệ.' });
-  if (!providerStatus()[provider]) return res.status(400).json({ error: 'Cổng thanh toán này chưa được bật.' });
+  if (!pkg) return res.status(400).json({ error: 'Invalid package.' });
+  if (!providerStatus()[provider]) return res.status(400).json({ error: 'This payment provider is not available.' });
 
   try {
     const recent = await Order.countDocuments({
       user: req.user._id, createdAt: { $gt: new Date(Date.now() - 3600 * 1000) },
     });
     if (recent >= MAX_PENDING_PER_HOUR) {
-      return res.status(429).json({ error: 'Bạn tạo quá nhiều đơn, vui lòng thử lại sau.' });
+      return res.status(429).json({ error: 'You have created too many orders, please try again later.' });
     }
 
     // Số tiền + số credits do SERVER quyết định từ bảng giá, không nhận từ client
@@ -87,25 +87,25 @@ router.post('/checkout', async (req, res) => {
         await order.save();
         url = checkout.url;
       } else {
-        throw new Error('Cổng thanh toán không được hỗ trợ'); // không xảy ra: provider đã được kiểm tra ở trên
+        throw new Error('This payment provider is not supported'); // không xảy ra: provider đã được kiểm tra ở trên
       }
     } catch (err) {
       console.error(`[payments/checkout:${provider}]`, err.message);
       await credits.markOrderFailed(order._id, err.message);
-      return res.status(502).json({ error: 'Không tạo được phiên thanh toán, vui lòng thử lại.' });
+      return res.status(502).json({ error: 'Failed to create payment session, please try again later.' });
     }
     res.json({ url, orderId: order._id });
   } catch (err) {
     console.error('[payments/checkout]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Failed to create payment session, please try again later.' });
   }
 });
 
 router.post('/orders/:id/refresh', async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Không tìm thấy đơn.' });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Order not found.' });
     let order = await Order.findOne({ _id: req.params.id, user: req.user._id });
-    if (!order) return res.status(404).json({ error: 'Không tìm thấy đơn.' });
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
 
     // Polar: không phụ thuộc webhook (localhost không nhận được webhook) -> tự hỏi Polar kết quả
     if (order.status === 'pending' && order.provider === 'polar' && order.providerRef) {
@@ -125,7 +125,7 @@ router.post('/orders/:id/refresh', async (req, res) => {
     res.json({ order: orderJson(order), credits: await credits.getBalance(req.user._id) });
   } catch (err) {
     console.error('[payments/refresh]', err);
-    res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại sau.' });
+    res.status(500).json({ error: 'Failed to refresh order status, please try again later.' });
   }
 });
 

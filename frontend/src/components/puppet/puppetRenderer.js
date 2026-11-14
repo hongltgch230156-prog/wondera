@@ -18,6 +18,7 @@ export const PUPPET_FIT = {
   SLICE: 1.5,         // bề dày mỗi lát (px texture). Nhỏ hơn = mịn hơn nhưng nhiều lệnh vẽ hơn (1.0 ~ 2.0 là hợp lý)
   BLEND: 1.6,         // chiều dài vùng uốn mỗi bên khuỷu / gối = BLEND x nửa bề rộng chi (tăng = kiểu "ống cao su")
   HIP_BLEND: 0,       // 0 = đùi bám THẲNG vào gấu áo (mép ngoài đi thẳng xuống). >0 = vùng chuyển mềm (HIP_BLEND x nửa bề rộng đùi), nhưng mép ngoài sẽ lõm nhẹ
+  SHOULDER_BLEND: 1.6, // kiểu vai "blend" (tay áo liền thân): chiều dài vùng chuyển thân -> tay = SHOULDER_BLEND x nửa bề rộng tay
   HIP_TUCK: 1.1,      // (khi HIP_BLEND = 0) đầu đùi được nối dài lên dưới gấu áo HIP_TUCK x nửa bề rộng đùi để lấp khe hở khi đùi xoè ra
   HIP_TO_CROTCH: 0.04, // khoảng cách từ khớp háng tới đáy gấu áo / chỗ chia chân (x chiều cao nhân vật) – khớp với rigEngine
   PAD_ARM: 1.12,      // nới bề rộng vùng cắt của tay so với bề rộng đo được (để không cắt mất nét viền)
@@ -93,7 +94,9 @@ export function forEachSlice(rb, xf, cb) {
   while (dTh > Math.PI) dTh -= 2 * Math.PI;
   while (dTh < -Math.PI) dTh += 2 * Math.PI;
   const sA = Math.hypot(mA.a, mA.b), sB = Math.hypot(mB.a, mB.b), cur = applyXf(mB, rb.pivot), p = rb.pivot;
-  const sw = rb.len / rb.count, ov = 0.6;
+  const sw = rb.len / rb.count;
+  // chỗ gập càng gấp thì mép ngoài càng "toác" giữa hai lát kề nhau -> cho các lát chồng nhau nhiều hơn (tỉ lệ với góc gập mỗi lát)
+  const stepAng = Math.abs(dTh) * 1.5 * Math.abs(rb.t1 - rb.t0) * sw / rb.len, ov = Math.min(6, 0.6 + 1.6 * rb.hw * stepAng);
   for (let i = 0; i < rb.count; i++) {
     const lx0 = i * sw, lx1 = lx0 + sw;
     const w = smooth01(rb.t0 + (rb.t1 - rb.t0) * ((lx0 + lx1) / 2 / rb.len));
@@ -106,11 +109,11 @@ export function forEachSlice(rb, xf, cb) {
  * Một chi hai đoạn: S (khớp gốc: vai / hông) -> M (khuỷu / gối) -> E (cổ tay / mắt cá).
  * root (chỉ chân): khoá xương mà đoạn gốc phải chuyển dần từ đó sang ("torso"); drop: khoảng cách từ khớp tới nơi chân bắt đầu lộ ra.
  */
-function limbParts(F, { S, M, E, hwA, hwB, keyA, keyB, tail, root = null, drop = 0, rootCap = false }) {
+function limbParts(F, { S, M, E, hwA, hwB, keyA, keyB, tail, root = null, rootZone = 0, tuck = false, drop = 0, rootCap = false }) {
   const dA = unit(sub(M, S)), dB = unit(sub(E, M));
   const lenA = dist(S, M), lenB = dist(M, E);
   const out = [];
-  const zr0 = root ? Math.min(F.HIP_BLEND * hwA, 0.3 * lenA) : 0;
+  const zr0 = root ? Math.min(rootZone, 0.3 * lenA) : 0;
   const z = Math.min(F.BLEND * Math.max(hwA, hwB), 0.42 * Math.min(lenA - drop - zr0, lenB));
   if (!F.SOFT_BEND || z < 3) {                             // kiểu khớp cứng (dự phòng)
     out.push({ xf: keyA, shapes: [capsule(S, M, hwA, hwB)] });
@@ -123,8 +126,8 @@ function limbParts(F, { S, M, E, hwA, hwB, keyA, keyB, tail, root = null, drop =
   // Khi không có vùng chuyển: đoạn đùi bắt đầu NGAY DƯỚI nét viền gấu áo (bỏ qua nét viền để nó không xoay theo chân),
   // và được nối dài lên dưới gấu áo bằng cách kéo dãn hàng pixel ruột chân ngay dưới gấu áo (xem drawExtrude).
   const GAP = 1.5;
-  const startA = root ? at(S, dA, drop + (zr || GAP)) : S;
-  if (root && !zr && F.HIP_TUCK > 0) out.push({ extrude: true, xf: keyA, O: startA, u: dA, n: { x: -dA.y, y: dA.x }, hw: hwA, ext: F.HIP_TUCK * hwA, len: 2 });
+  const startA = root ? at(S, dA, drop + (zr || (tuck ? GAP : 0))) : S;
+  if (root && tuck && !zr && F.HIP_TUCK > 0) out.push({ extrude: true, xf: keyA, O: startA, u: dA, n: { x: -dA.y, y: dA.x }, hw: hwA, ext: F.HIP_TUCK * hwA, len: 2 });
   out.push({ xf: keyA, shapes: [bar(startA, at(M, dA, -z), hwA, root && zr ? ov : 0, ov), ...(rootCap ? [circle(S, hwA / F.PAD_ARM * 0.97)] : [])] });
   out.push({ xf: keyB, shapes: [bar(at(M, dB, z), E, hwB, ov, 0), circle(E, hwB), ...tail] });
   // --- háng: dải chuyển từ thân sang đùi, bắt đầu đúng ở gấu áo với trọng số 0 (liền mạch, không bậc, không hở) ---
@@ -162,19 +165,23 @@ export function buildParts(rig, F = PUPPET_FIT) {
     const d = Math.hypot(w.x - e.x, w.y - e.y) || 1;
     return circle({ x: w.x + (w.x - e.x) / d * armR * 0.8, y: w.y + (w.y - e.y) / d * armR * 0.8 }, armR * 1.5);
   };
-  const headW = W.head * 1.9;
+  const headW = W.head * 1.2;                         // đủ rộng cho đầu + tai nghe / sừng, không ăn vào vai
   const crotchDrop = F.HIP_TO_CROTCH * b.h;
   const torsoAxis = unit(sub(J.hip, J.neck));
   const pelvisHw = Math.max(W.torso * 1.08, Math.abs(J.hipL.x - J.hipR.x) / 2 + legHw(W.thigh));
   const leg = (side) => limbParts(F, {
     S: J["hip" + side], M: J["knee" + side], E: ext(J["knee" + side], J["ankle" + side], 0.2),
     hwA: legHw(Math.max(W.thigh, W.shin)), hwB: legHw(W.shin),
-    keyA: "thigh" + side, keyB: "shin" + side, tail: [foot(side)], root: "torso", drop: crotchDrop,
+    keyA: "thigh" + side, keyB: "shin" + side, tail: [foot(side)], root: "torso", rootZone: F.HIP_BLEND * legHw(Math.max(W.thigh, W.shin)), tuck: true, drop: crotchDrop,
   });
+  // Kiểu vai: "pin" (mặc định, giữ nguyên như con mèo): đầu tròn của tay xoay tại chỗ. "blend": tay áo liền khối với thân
+  // -> không có đầu tròn riêng, đoạn đầu tay chuyển dần từ "xoay theo thân" sang "xoay theo tay" (không còn khối chữ nhật dính ở vai).
+  const blendShoulder = rig.shoulderStyle === "blend";
   const arm = (side) => limbParts(F, {
     S: restShoulderPivot(rig, side), M: J["elbow" + side], E: J["wrist" + side],
     hwA: armHw, hwB: armHw,
-    keyA: "upperArm" + side, keyB: "foreArm" + side, tail: [hand(J["wrist" + side], J["elbow" + side])], rootCap: true,
+    keyA: "upperArm" + side, keyB: "foreArm" + side, tail: [hand(J["wrist" + side], J["elbow" + side])],
+    ...(blendShoulder ? { root: "torso", rootZone: F.SHOULDER_BLEND * armHw } : { rootCap: true }),
   });
 
   return [

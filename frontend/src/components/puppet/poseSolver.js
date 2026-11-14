@@ -51,7 +51,7 @@ export const applyXf = (m, p) => ({ x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x
 export const SHOULDER_INSET = 0.85;
 export function restShoulderPivot(rig, side) {
   const a = rig.joints["shoulder" + side], e = rig.joints["elbow" + side];
-  const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy) || 1, k = SHOULDER_INSET * (rig.widths?.arm || 0);
+  const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy) || 1, k = (rig.shoulderInset ?? SHOULDER_INSET) * (rig.widths?.arm || 0);
   return { x: a.x + dx / d * k, y: a.y + dy / d * k };
 }
 export function solvePose(rig, params) {

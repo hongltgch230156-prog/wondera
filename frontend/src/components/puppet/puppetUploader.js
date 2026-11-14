@@ -64,7 +64,10 @@ export function createUploader(host, { onUse } = {}) {
             <div class="ps-up-edit-wrap"><canvas data-edit aria-label="Rig editor – drag the dots"></canvas><span class="ps-up-cap">Drag the dots to fix joints</span></div>
             <div class="ps-up-prev-wrap"><canvas data-prev aria-label="Live test of the rig"></canvas><span class="ps-up-cap">Live test</span></div>
           </div>
-          <ul class="ps-up-checks" data-checks></ul>
+          <section class="ps-report" data-report hidden aria-live="polite">
+            <header class="ps-report-head"><span class="ps-report-title">PICTURE CHECK</span><span class="ps-report-chip" data-chip></span></header>
+            <ul class="ps-report-list" data-checks></ul>
+          </section>
           <div class="ps-up-row">
             <label class="ps-up-field">Name <input type="text" maxlength="24" data-name placeholder="My Puppet" /></label>
             <label class="ps-up-check"><input type="checkbox" data-mirror checked /> Mirror left / right</label>
@@ -81,31 +84,53 @@ export function createUploader(host, { onUse } = {}) {
   host.appendChild(root);
 
   const $ = (s) => root.querySelector(s);
-  const el = { drop: $("[data-drop]"), file: $("[data-file]"), exports: $("[data-exports]"), editor: $("[data-editor]"), edit: $("[data-edit]"), prev: $("[data-prev]"), checks: $("[data-checks]"), name: $("[data-name]"), mirror: $("[data-mirror]"), status: $("[data-status]"), redo: $('[data-act="redo"]'), use: $('[data-act="use"]') };
+  const el = { report: $("[data-report]"), chip: $("[data-chip]"), drop: $("[data-drop]"), file: $("[data-file]"), exports: $("[data-exports]"), editor: $("[data-editor]"), edit: $("[data-edit]"), prev: $("[data-prev]"), checks: $("[data-checks]"), name: $("[data-name]"), mirror: $("[data-mirror]"), status: $("[data-status]"), redo: $('[data-act="redo"]'), use: $('[data-act="use"]') };
   const st = { img: null, clean: null, rig: null, report: null, sprite: null, raf: 0, name: "", busy: false };
   const editor = new RigEditor(el.edit, { onChange: () => { st.dirty = true; } });
   const say = (t, level = "") => { el.status.textContent = t; el.status.dataset.level = level; };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const CK_ICON = { ok: "✓", warn: "!", error: "✕" };
+  const BUSY_STEPS = ["Reading your picture", "Removing the background", "Finding head and arms", "Finding both legs", "Placing the joints"];
+  /** Đang phân tích: các bước hiện lần lượt kèm vòng xoay */
+  function showAnalyzing() {
+    el.report.hidden = false; el.report.dataset.state = "busy"; delete el.report.dataset.level;
+    el.chip.textContent = "Analysing…";
+    el.checks.innerHTML = BUSY_STEPS.map((t, n) => `<li class="ps-ck is-busy" style="--i:${n}"><span class="ps-ck-ico"><i class="ps-spin"></i></span><span class="ps-ck-txt">${t}…</span></li>`).join("");
+  }
+  /** Có kết quả: từng dòng hiện dần (CSS animation-delay theo --i), cuối cùng huy hiệu tổng kết hiện ra */
+  function showReport(items) {
+    const worst = items.some((i) => i.level === "error") ? "error" : items.some((i) => i.level === "warn") ? "warn" : "ok";
+    el.report.hidden = false; el.report.dataset.state = "done"; el.report.dataset.level = worst;
+    el.report.style.setProperty("--n", items.length);
+    el.chip.textContent = worst === "ok" ? "All good" : worst === "warn" ? "Almost there" : "Needs a fix";
+    el.checks.innerHTML = items.map((i, n) => `<li class="ps-ck is-${i.level}" style="--i:${n}"><span class="ps-ck-ico" aria-hidden="true">${CK_ICON[i.level]}</span><span class="ps-ck-txt">${esc(i.text)}</span></li>`).join("");
+  }
 
   /* ------------------------------------------------------------ */
   function showSource() { el.drop.hidden = false; el.editor.hidden = true; el.exports.hidden = true; el.redo.hidden = true; el.use.disabled = true; stopPreview(); say(""); }
 
   async function process(img, name) {
     if (st.busy) return; st.busy = true; say("Analysing the picture…", "info");
+    const t0 = performance.now();
     try {
-      await new Promise((r) => setTimeout(r, 30));            // cho giao diện kịp hiện chữ "Analysing"
+      el.drop.hidden = true; el.exports.hidden = true; el.editor.hidden = false; el.redo.hidden = true; el.use.disabled = true;
+      stopPreview(); showAnalyzing();
+      await sleep(60);                                        // cho giao diện kịp vẽ khung phân tích
       st.img = img; st.name = name || "My Puppet";
       st.clean = cleanImage(img);
-      redetect();
-    } catch (e) { console.warn(e); say("Could not read this picture.", "error"); }
+      await redetect(t0);
+    } catch (e) { console.warn(e); showSource(); say("Could not read this picture.", "error"); }
     finally { st.busy = false; }
   }
-  function redetect() {
+  async function redetect(t0 = 0) {
+    if (t0) await sleep(50);
     const id = st.clean.canvas.getContext("2d").getImageData(0, 0, st.clean.canvas.width, st.clean.canvas.height);
     const { rig, report } = analyzeRig(id);
     st.rig = rig; st.report = report;
     st.sprite = new PuppetSprite(st.clean.canvas, rig);
     const v = validatePuppet({ clean: st.clean, report, rig });
-    el.checks.innerHTML = v.items.map((i) => `<li class="is-${i.level}"><span>${i.level === "ok" ? "✓" : i.level === "warn" ? "!" : "✕"}</span>${esc(i.text)}</li>`).join("");
+    if (t0) await sleep(Math.max(0, 900 - (performance.now() - t0)));   // đủ thời gian để các bước phân tích hiện lần lượt, không nháy
+    showReport(v.items);
     el.name.value = st.name;
     el.drop.hidden = true; el.exports.hidden = true; el.editor.hidden = false; el.redo.hidden = false;
     el.use.disabled = !v.ok;
@@ -139,15 +164,22 @@ export function createUploader(host, { onUse } = {}) {
     const rig = st.rig, s = (h * 0.74) / rig.bounds.h;
     const root0 = { x: w / 2, y: h * 0.13 + (rig.joints.hip.y - rig.bounds.y) * s };
     const base = solvePose(rig, { scale: s, root: root0 });
-    const wave = Math.sin(t * 3), step = Math.sin(t * 2.2);
-    const aLen = base.reach.armR, lLen = base.reach.legR;
+    // Dáng đứng thả lỏng: hai tay buông xuôi (hơi lệch ra ngoài ~17-22°), đung đưa nhẹ NGƯỢC PHA nhau; hai chân đứng thẳng.
+    // (Bản cũ vung tay lên / đá chân liên tục nên khuỷu gập quá mức, nhiều con rối nhìn rất kỳ.)
+    const sw = Math.sin(t * 2.2), sw2 = Math.sin(t * 2.2 + Math.PI);
+    const aLen = base.reach.armR, lLen = base.reach.legR, J0 = base.joints;
+    const ax = (f) => 0.30 + 0.07 * f, ay = (x) => Math.sqrt(Math.max(0, 1 - x * x));   // cánh tay (gần) duỗi thẳng
     const tg = {
-      wristR: { x: base.joints.shoulderR.x - aLen * 0.25, y: base.joints.shoulderR.y - aLen * (0.55 + 0.4 * wave) },
-      wristL: { x: base.joints.shoulderL.x + aLen * (0.5 + 0.35 * wave), y: base.joints.shoulderL.y + aLen * 0.25 },
-      ankleR: { x: base.joints.hipR.x - lLen * (0.25 + 0.2 * step), y: base.joints.hipR.y + lLen * (0.9 - 0.2 * Math.max(0, step)) },
-      ankleL: { x: base.joints.hipL.x + lLen * (0.25 - 0.2 * step), y: base.joints.hipL.y + lLen * (0.9 - 0.2 * Math.max(0, -step)) },
+      wristR: { x: J0.shoulderR.x - aLen * ax(sw),  y: J0.shoulderR.y + aLen * ay(ax(sw)) },
+      wristL: { x: J0.shoulderL.x + aLen * ax(sw2), y: J0.shoulderL.y + aLen * ay(ax(sw2)) },
+      ankleR: { x: J0.hipR.x - lLen * 0.07, y: J0.hipR.y + lLen * 0.99 },
+      ankleL: { x: J0.hipL.x + lLen * 0.07, y: J0.hipL.y + lLen * 0.99 },
     };
-    const pose = solvePose(rig, { scale: s, root: root0, lean: 0.06 * wave, headTilt: 0.1 * Math.sin(t * 2), targets: tg });
+    const pose = solvePose(rig, {
+      scale: s, root: root0, lean: 0.015 * sw, headTilt: 0.04 * Math.sin(t * 1.7 + 0.6),
+      targets: tg, prev: st.prevJ, limits: { armMaxReach: 0.997 },   // cho phép tay gần như thẳng (game vẫn dùng 0.98)
+    });
+    st.prevJ = pose.joints;
     drawPuppet(g, st.sprite, pose);
   }
 
@@ -190,7 +222,7 @@ export function createUploader(host, { onUse } = {}) {
       case "file": el.file.click(); break;
       case "exports": openExports(); break;
       case "back": showSource(); break;
-      case "redo": if (st.clean) { st.rig = null; redetect(); } break;
+      case "redo": if (st.clean) { st.rig = null; stopPreview(); showAnalyzing(); redetect(performance.now()); } break;
       case "use": {
         if (!st.rig) return;
         const pkg = makePackage({ name: el.name.value.trim() || st.name, texture: st.clean.canvas, rig: st.rig });

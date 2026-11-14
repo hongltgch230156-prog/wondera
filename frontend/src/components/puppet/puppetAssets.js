@@ -78,21 +78,21 @@ const wrap = (body) =>
 
 export const EQUIPMENT = {
   racket: [
-    { id: "pingpong", name: "Ping-pong", grip: [60, 282], head: [60, 112], headR: 0.9, size: 1.0,
+    { id: "pingpong", name: "Ping-pong", grip: [60, 250], head: [60, 112], headR: 0.9, size: 1.0,
       svg: wrap(`<rect x="52" y="168" width="16" height="116" rx="6" fill="#c98b4e" stroke="#6b4423" stroke-width="4"/>
         <circle cx="60" cy="112" r="58" fill="#d94a3d" stroke="#6b2a22" stroke-width="5"/>
         <circle cx="60" cy="112" r="44" fill="none" stroke="#f3b3a8" stroke-width="3" opacity=".7"/>`) },
-    { id: "tennis", name: "Tennis", grip: [60, 286], head: [60, 100], headR: 1.1, size: 1.0,
+    { id: "tennis", name: "Tennis", grip: [60, 252], head: [60, 100], headR: 1.1, size: 1.0,
       svg: wrap(`<rect x="54" y="190" width="12" height="98" rx="5" fill="#2f3b52" stroke="#161d2b" stroke-width="4"/>
         <path d="M60 196 L44 168 M60 196 L76 168" stroke="#161d2b" stroke-width="5" fill="none"/>
         <ellipse cx="60" cy="100" rx="46" ry="68" fill="#e9f6c9" fill-opacity=".55" stroke="#2f3b52" stroke-width="7"/>
         <path d="M60 36V164 M36 70V132 M84 70V132 M18 100H102 M26 74H94 M26 126H94" stroke="#2f3b52" stroke-width="2.2" opacity=".8"/>`) },
-    { id: "badminton", name: "Badminton", grip: [60, 288], head: [60, 92], headR: 1.0, size: 1.0,
+    { id: "badminton", name: "Badminton", grip: [60, 254], head: [60, 92], headR: 1.0, size: 1.0,
       svg: wrap(`<rect x="57" y="162" width="6" height="128" rx="3" fill="#33384a" stroke="#14172a" stroke-width="3"/>
         <rect x="52" y="226" width="16" height="62" rx="6" fill="#e8c24a" stroke="#6b5518" stroke-width="3"/>
         <ellipse cx="60" cy="92" rx="36" ry="52" fill="#dff3ff" fill-opacity=".5" stroke="#33384a" stroke-width="6"/>
         <path d="M60 42V142 M40 62V122 M80 62V122 M26 92H94 M32 72H88 M32 112H88" stroke="#33384a" stroke-width="1.8" opacity=".8"/>`) },
-    { id: "pan", name: "Frying pan", grip: [60, 288], head: [60, 108], headR: 1.0, size: 1.0,
+    { id: "pan", name: "Frying pan", grip: [60, 254], head: [60, 108], headR: 1.0, size: 1.0,
       svg: wrap(`<rect x="52" y="164" width="16" height="124" rx="7" fill="#7b4a2b" stroke="#2f1b0f" stroke-width="4"/>
         <circle cx="60" cy="108" r="56" fill="#3b3f46" stroke="#14161a" stroke-width="6"/>
         <circle cx="60" cy="108" r="42" fill="#555b65" stroke="#2a2d33" stroke-width="3"/>
@@ -110,7 +110,7 @@ export const EQUIPMENT = {
         <rect x="38" y="212" width="44" height="12" rx="5" fill="#a74b4b" stroke="#4a1c1c" stroke-width="4"/>
         <rect x="53" y="224" width="14" height="52" rx="6" fill="#3b2a24" stroke="#150e0c" stroke-width="4"/>
         <circle cx="60" cy="284" r="8" fill="#a74b4b" stroke="#4a1c1c" stroke-width="4"/>`) },
-    { id: "spear", name: "Short spear", grip: [60, 290], tip: [60, 14], size: 1.0,
+    { id: "spear", name: "Short spear", grip: [60, 254], tip: [60, 14], size: 1.0,
       svg: wrap(`<path d="M60 8 L74 52 L60 64 L46 52 Z" fill="#e6ebf2" stroke="#4a5568" stroke-width="5"/>
         <path d="M52 64 L68 64 L64 84 L56 84 Z" fill="#c0392b" stroke="#5c1a12" stroke-width="3"/>
         <rect x="55" y="82" width="10" height="208" rx="5" fill="#8a5a33" stroke="#3a2412" stroke-width="4"/>`) },

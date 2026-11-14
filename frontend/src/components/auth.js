@@ -65,11 +65,11 @@ async function authRequest(path, body) {
       body: JSON.stringify(body),
     });
   } catch {
-    throw new Error("Không kết nối được máy chủ. Hãy kiểm tra backend đã chạy chưa.");
+    throw new Error("Can't reach the server. Please check that the backend is running.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || "Có lỗi xảy ra, vui lòng thử lại.");
+    const err = new Error(data.error || "An error occurred, please try again.");
     err.code = data.code;
     throw err;
   }
@@ -112,7 +112,7 @@ function loadGsi() {
     s.src = "https://accounts.google.com/gsi/client";
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () => { gsiPromise = null; reject(new Error("Không tải được Google Sign-In.")); };
+    s.onerror = () => { gsiPromise = null; reject(new Error("Couldn't load Google Sign-In.")); };
     document.head.appendChild(s);
   });
   return gsiPromise;
@@ -168,7 +168,7 @@ const MASCOT = `
 
 const OWL = `
 <svg class="auth-owl" viewBox="0 0 28 36" aria-hidden="true">
-  <path d="M5 8 8 2l4 4h4l4-4 3 6c1 2 1 4 1 6v12c0 5-4 8-10 8S4 33 4 28V14c0-2 0-4 1-6z" fill="#1a1536" stroke="#2a2350" stroke-width="1"/>
+  <path d="M5 8 8 2l4 4h4l4-4 3 6c1 2 1 4 1 6v12c0 5-4 8-10 8S4 33 4 28V14c0-2 0-4 1-6z" fill="#7d7a96" stroke="#a5a2bd" stroke-width="1"/>
   <circle cx="10" cy="14" r="4.4" fill="#fff4dc"/><circle cx="18" cy="14" r="4.4" fill="#fff4dc"/>
   <circle cx="10" cy="14.4" r="1.9" fill="#1a1536"/><circle cx="18" cy="14.4" r="1.9" fill="#1a1536"/>
   <path d="m12.6 18.5 1.4 2 1.4-2z" fill="#e0b85a"/>
@@ -189,8 +189,8 @@ function pwField(id, label, autocomplete, extraRow = "", collapsed = false) {
         <input class="auth-input" id="${id}" name="${id}" type="password" placeholder="••••••••"
                autocomplete="${autocomplete}" ${collapsed ? "disabled" : ""} />
         <div class="auth-reveal" aria-hidden="true"></div>
-        <button class="auth-eye" type="button" aria-label="Bật đèn pin để xem mật khẩu"
-                aria-pressed="false" data-tip="Bật đèn">${ICONS.eye}${ICONS.torch}</button>
+        <button class="auth-eye" type="button" aria-label="Toggle password visibility"
+                aria-pressed="false" data-tip="Toggle password visibility">${ICONS.eye}${ICONS.torch}</button>
       </div>
     </div>`;
   return collapsed
@@ -204,7 +204,7 @@ function buildMarkup() {
   <div class="auth-bg auth-bg-dark"><i class="auth-stars"></i></div>
 
   <div class="auth-layout">
-    <section class="auth-card" aria-label="Đăng nhập hoặc đăng ký">
+    <section class="auth-card" aria-label="Login or Register">
       <header class="auth-brand">
         ${ICONS.logo}
         <div>
@@ -215,8 +215,8 @@ function buildMarkup() {
 
       <div class="auth-mascot">${MASCOT}</div>
 
-      <button class="auth-google" type="button">${ICONS.google}<span>Tiếp tục với Google</span></button>
-      <div class="auth-divider"><span>HOẶC</span></div>
+      <button class="auth-google" type="button">${ICONS.google}<span>Continue with Google</span></button>
+      <div class="auth-divider"><span>OR</span></div>
 
       <form class="auth-form" novalidate>
         <div class="auth-group">
@@ -229,16 +229,16 @@ function buildMarkup() {
           </div>
         </div>
 
-        ${pwField("auth-password", "Mật khẩu", "current-password",
-          `<button class="auth-forgot" type="button">Quên mật khẩu?</button>`)}
-        ${pwField("auth-confirm", "Xác nhận mật khẩu", "new-password", "", true)}
+        ${pwField("auth-password", "Password", "current-password",
+          `<button class="auth-forgot" type="button">Forgot Password?</button>`)}
+        ${pwField("auth-confirm", "Confirm Password", "new-password", "", true)}
 
         <p class="auth-error" role="alert"></p>
-        <button class="auth-submit" type="submit">Đăng nhập</button>
+        <button class="auth-submit" type="submit">Login</button>
       </form>
 
       <form class="auth-reset" novalidate>
-        <h2 class="auth-reset-title">Quên mật khẩu</h2>
+        <h2 class="auth-reset-title">Forgot Password</h2>
         <p class="auth-reset-hint"></p>
         <div class="auth-group">
           <div class="auth-label-row"><label class="auth-label" for="auth-reset-email">Email</label></div>
@@ -251,8 +251,8 @@ function buildMarkup() {
         <div class="auth-reset-step2">
           <div class="auth-group">
             <div class="auth-label-row">
-              <label class="auth-label" for="auth-reset-code">Mã xác nhận</label>
-              <button class="auth-forgot auth-resend" type="button">Gửi lại mã</button>
+              <label class="auth-label" for="auth-reset-code">Verification Code</label>
+              <button class="auth-forgot auth-resend" type="button">Resend Code</button>
             </div>
             <div class="auth-field" data-field="auth-reset-code">
               ${ICONS.lock}
@@ -260,15 +260,15 @@ function buildMarkup() {
                      placeholder="123456" autocomplete="one-time-code" style="padding-right:16px" />
             </div>
           </div>
-          ${pwField("auth-reset-password", "Mật khẩu mới", "new-password")}
-          ${pwField("auth-reset-confirm", "Xác nhận mật khẩu mới", "new-password")}
+          ${pwField("auth-reset-password", "New Password", "new-password")}
+          ${pwField("auth-reset-confirm", "Confirm New Password", "new-password")}
         </div>
         <p class="auth-error" role="alert"></p>
-        <button class="auth-submit auth-reset-submit" type="submit">Gửi mã xác nhận</button>
-        <p class="auth-switch"><button class="auth-back" type="button">← Quay lại đăng nhập</button></p>
+        <button class="auth-submit auth-reset-submit" type="submit">Send Verification Code</button>
+        <p class="auth-switch"><button class="auth-back" type="button">← Back to Login</button></p>
       </form>
 
-      <p class="auth-switch"><span class="auth-switch-text">Chưa có tài khoản?</span> <button class="auth-switch-btn" type="button">Đăng ký ngay</button></p>
+      <p class="auth-switch"><span class="auth-switch-text">Don't have an account?</span> <button class="auth-switch-btn" type="button">Register now</button></p>
     </section>
 
     <div class="auth-scene">${SCENE_SVG}</div>
@@ -358,9 +358,9 @@ function createAuthUI(onSuccess) {
     mode = next;
     root.dataset.mode = next;
     const isLogin = next === "login";
-    submitBtn.textContent = isLogin ? "Đăng nhập" : "Đăng ký";
-    switchText.textContent = isLogin ? "Chưa có tài khoản?" : "Đã có tài khoản?";
-    switchBtn.textContent = isLogin ? "Đăng ký ngay" : "Đăng nhập";
+    submitBtn.textContent = isLogin ? "Login" : "Register";
+    switchText.textContent = isLogin ? "Don't have an account?" : "Already have an account?";
+    switchBtn.textContent = isLogin ? "Register now" : "Login";
     pwInput.autocomplete = isLogin ? "current-password" : "new-password";
     confirmInput.disabled = isLogin;
     confirmInput.value = "";
@@ -376,11 +376,11 @@ function createAuthUI(onSuccess) {
     resetStep = step;
     root.dataset.step = String(step);
     resetEmail.readOnly = step === 2;
-    resetSubmit.textContent = step === 1 ? "Gửi mã xác nhận" : "Đặt lại mật khẩu";
+    resetSubmit.textContent = step === 1 ? "Send Verification Code" : "Reset Password";
     resetHint.textContent =
       step === 1
-        ? "Nhập email đã đăng ký, chúng mình sẽ gửi mã xác nhận 6 số."
-        : "Nhập mã vừa nhận qua email và đặt mật khẩu mới.";
+        ? "Enter your registered email and we'll send you a 6-digit verification code."
+        : "Enter the code you received and your new password.";
     (step === 1 ? resetEmail : resetCode).focus();
   }
 
@@ -389,7 +389,7 @@ function createAuthUI(onSuccess) {
     let left = sec;
     resendBtn.disabled = true;
     const tick = () => {
-      resendBtn.textContent = left > 0 ? `Gửi lại sau ${left}s` : "Gửi lại mã";
+      resendBtn.textContent = left > 0 ? `Send again in ${left}s` : "Send code again";
       if (left-- <= 0) {
         clearInterval(resendTimer);
         resendBtn.disabled = false;
@@ -446,7 +446,7 @@ function createAuthUI(onSuccess) {
     const email = resetEmail.value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       markInvalid(resetEmail);
-      return showError("Vui lòng nhập một địa chỉ email hợp lệ.");
+      return showError("Please enter a valid email address.");
     }
 
     // Bước 1: xin mã
@@ -468,21 +468,21 @@ function createAuthUI(onSuccess) {
     const password = resetPw.value;
     if (!/^\d{6}$/.test(code)) {
       markInvalid(resetCode);
-      return showError("Mã xác nhận gồm 6 chữ số.");
+      return showError("The verification code must be 6 digits.");
     }
     if (password.length < 8) {
       markInvalid(resetPw);
-      return showError("Mật khẩu cần ít nhất 8 ký tự.");
+      return showError("The password must be at least 8 characters long.");
     }
     if (password !== resetConfirm.value) {
       markInvalid(resetConfirm);
-      return showError("Mật khẩu xác nhận không khớp.");
+      return showError("The confirmed password does not match.");
     }
     setResetBusy(true);
     try {
       const data = await authRequest("/reset-password", { email, code, password });
       closeForgot(email);
-      showError(data.message || "Đặt lại mật khẩu thành công. Hãy đăng nhập.", true);
+      showError(data.message || "Password reset successfully. Please log in.", true);
     } catch (err) {
       showError(err.message);
     }
@@ -542,8 +542,8 @@ function createAuthUI(onSuccess) {
     root.classList.toggle("is-dark", dark);
     eyeBtns.forEach((b) => {
       b.setAttribute("aria-pressed", String(dark));
-      b.dataset.tip = dark ? "Bật đèn" : "Tắt đèn";
-      b.setAttribute("aria-label", dark ? "Bật đèn phòng" : "Tắt đèn, dùng đèn pin để xem mật khẩu");
+      b.dataset.tip = dark ? "Turn on the lights" : "Turn off the lights";
+      b.setAttribute("aria-label", dark ? "Turn on the lights" : "Turn off the lights, use the flashlight to view the password");
     });
     cancelAnimationFrame(raf);
     if (dark) {
@@ -577,15 +577,15 @@ function createAuthUI(onSuccess) {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       markInvalid(emailInput);
-      return showError("Vui lòng nhập một địa chỉ email hợp lệ.");
+      return showError("Please enter a valid email address.");
     }
     if (password.length < 8) {
       markInvalid(pwInput);
-      return showError(mode === "login" ? "Vui lòng nhập mật khẩu (tối thiểu 8 ký tự)." : "Mật khẩu cần ít nhất 8 ký tự.");
+      return showError(mode === "login" ? "Please enter a password (minimum 8 characters)." : "The password must be at least 8 characters long.");
     }
     if (mode === "register" && password !== confirmInput.value) {
       markInvalid(confirmInput);
-      return showError("Mật khẩu xác nhận không khớp.");
+      return showError("The confirmed password does not match.");
     }
 
     setBusy(true);
@@ -604,7 +604,7 @@ function createAuthUI(onSuccess) {
     if (busy) return;
     clearErrors();
     if (!GOOGLE_CLIENT_ID) {
-      return showError("Chưa cấu hình VITE_GOOGLE_CLIENT_ID trong frontend/.env");
+      return showError("VITE_GOOGLE_CLIENT_ID is not configured in frontend/.env");
     }
     try {
       await loadGsi();
@@ -613,7 +613,7 @@ function createAuthUI(onSuccess) {
           client_id: GOOGLE_CLIENT_ID,
           scope: "openid email profile",
           callback: async (resp) => {
-            if (resp.error || !resp.access_token) return showError("Đăng nhập Google không thành công.");
+            if (resp.error || !resp.access_token) return showError("Google login failed.");
             setBusy(true);
             try {
               finish(await authRequest("/google", { accessToken: resp.access_token }));
@@ -623,7 +623,7 @@ function createAuthUI(onSuccess) {
             }
           },
           error_callback: (err) => {
-            if (err?.type !== "popup_closed") showError("Không mở được cửa sổ đăng nhập Google (trình duyệt có thể đang chặn popup).");
+            if (err?.type !== "popup_closed") showError("Couldn't open the Google sign-in window (your browser may be blocking pop-ups).");
           },
         });
       }
