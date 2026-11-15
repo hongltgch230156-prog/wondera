@@ -174,6 +174,10 @@ export function initForge() {
     magicWandCredits = wallet.credits;
     updateMagicWandCredits();
   });
+  const refreshCredits = () => {
+    fetchWallet();
+    window.setTimeout(fetchWallet, 1500);
+  };
 
   const applyPlaceholderTransform = (rotationX, rotationY, scaleValue) => {
     if (!placeholderModel) return;
@@ -354,7 +358,7 @@ export function initForge() {
     if (sourceLabelCard) {
       sourceLabelCard.style.cursor = isMagicWandActive ? "crosshair" : "pointer";
     }
-    const showCredits = currentMode === "multiple" && isMagicWandExpanded;
+    const showCredits = true; // thanh credits luôn hiện (Single object + Multiple objects)
     forgeMagicCredits?.setAttribute("aria-hidden", String(!showCredits));
     forgeViewer?.closest(".forge-output-panel")?.classList.toggle("magic-wand-active", showCredits);
     forgeBody?.classList.toggle("magic-wand-active", showCredits);
@@ -428,6 +432,92 @@ export function initForge() {
       setUploadPreview(preview, card, input.dataset.slot === "pose"
         ? modeStates.single.posePreviewUrl
         : modeState.sourcePreviewUrl);
+    });
+  });
+
+  // ========================================
+  // CLEAR / CANCEL UPLOADED IMAGES
+  // ========================================
+
+  document.querySelectorAll(".forge-clear-upload-btn").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      // Không cho click nút kích hoạt label upload
+      event.preventDefault();
+      event.stopPropagation();
+
+      const card = button.closest(".forge-upload-card");
+      const input = card?.querySelector(".forge-input");
+      const preview = card?.querySelector(".forge-preview");
+
+      if (!card || !input || !preview) return;
+
+      const slot = input.dataset.slot;
+
+      // --------------------------------
+      // 1. XÓA SOURCE IMAGE
+      // --------------------------------
+      if (slot === "source") {
+        const modeState = modeStates[currentMode];
+
+        // Giải phóng URL ảnh cũ
+        if (modeState.sourcePreviewUrl) {
+          URL.revokeObjectURL(modeState.sourcePreviewUrl);
+        }
+
+        // Reset dữ liệu upload
+        modeState.sourceFile = null;
+        modeState.sourcePreviewUrl = null;
+
+        // Reset file đang được sử dụng
+        currentFileToUpload = null;
+
+        // Xóa kết quả 3D cũ
+        clearModeResult(currentMode);
+        clearThreeJSPreview();
+
+        // Reset Magic Wand
+        selectedMagicPoint = null;
+        selectedIsolatedImageUrl = null;
+        isMagicWandActive = false;
+        isMagicWandExpanded = false;
+
+        updateMagicWandState();
+      }
+
+      // --------------------------------
+      // 2. XÓA POSE IMAGE
+      // --------------------------------
+      else if (slot === "pose") {
+        const singleState = modeStates.single;
+
+        if (singleState.posePreviewUrl) {
+          URL.revokeObjectURL(singleState.posePreviewUrl);
+        }
+
+        singleState.poseFile = null;
+        singleState.posePreviewUrl = null;
+
+        currentPoseFile = null;
+
+        // Xóa model cũ được tạo từ pose trước đó
+        clearModeResult("single");
+
+        if (currentMode === "single") {
+          clearThreeJSPreview();
+        }
+      }
+
+      // --------------------------------
+      // 3. RESET INPUT VÀ PREVIEW
+      // --------------------------------
+
+      // Cho phép upload lại chính ảnh vừa xóa
+      input.value = "";
+
+      // Xóa ảnh preview và trạng thái is-filled
+      setUploadPreview(preview, card, null);
+
+      console.log(`[3D Forge] Removed ${slot} image`);
     });
   });
 
@@ -667,6 +757,15 @@ export function initForge() {
       return;
     }
     if (isGenerationInProgress || isMagicWandPending) return;
+    // Hết credits -> mở thông báo mua thêm (server vẫn kiểm tra lại, đây chỉ để phản hồi nhanh)
+    if (magicWandCredits !== null && magicWandCredits <= 0) {
+      notifyOutOfCredits();
+      return;
+    }
+    if (magicWandCredits !== null) {
+      magicWandCredits--; // trừ tạm trên giao diện, số thật do server trả về
+      updateMagicWandCredits();
+    }
     let progressEstimator = null;
     const defaultLabel = endpointMode === "single" ? "Generate 3D" : "Generate Scene";
     const buttonLabel = activeButton.querySelector("span");
@@ -689,10 +788,17 @@ export function initForge() {
         body: formData
       });
       const taskData = await taskRes.json();
+      if (taskRes.status === 402) {
+        notifyOutOfCredits();
+        throw new Error("__out_of_credits__");
+      }
       if (!taskRes.ok || taskData.error || taskData.code !== 0) {
         throw new Error(taskData.error || "Tạo task thất bại từ server");
       }
-
+      if (typeof taskData.data?.credits === "number") {
+        magicWandCredits = taskData.data.credits; // số credits thật còn lại
+        updateMagicWandCredits();
+      }
       const taskId = taskData.data.task_id;
       const checkInterval = setInterval(async () => {
         try {
@@ -750,6 +856,7 @@ export function initForge() {
           clearInterval(checkInterval);
           console.error(error);
           alert("Lỗi: " + error.message);
+          refreshCredits(); // server tự hoàn credit khi task lỗi
           progressEstimator?.reset();
           setGenerationBusy(false);
           if (buttonLabel) buttonLabel.textContent = defaultLabel;
@@ -757,7 +864,8 @@ export function initForge() {
       }, 3000);
     } catch (error) {
       console.error(error);
-      alert("Lỗi: " + error.message);
+      if (error.message !== "__out_of_credits__") alert("Lỗi: " + error.message);
+      refreshCredits(); // khôi phục số dư thật (đã trừ tạm ở trên)
       progressEstimator?.reset();
       setGenerationBusy(false);
       if (buttonLabel) buttonLabel.textContent = defaultLabel;

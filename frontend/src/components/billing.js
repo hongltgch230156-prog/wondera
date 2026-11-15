@@ -3,7 +3,7 @@ let ctx = { apiBase: "", getToken: () => null };
 const state = {
   loaded: false,
   credits: null,          // null = chưa biết
-  freeCredits: 2,
+  freeCredits: 4,
   costs: {},
   history: [],
   packages: [],           // [{ id, label, credits, vnd, usd, popular }]
@@ -90,9 +90,38 @@ const ICON = {
   coin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1 1.1-1.7 2.5-1.7s2.5.7 2.5 1.7-1.1 1.6-2.5 1.9-2.5.9-2.5 2 1.1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></svg>`,
 };
 
-/** Hết credits: chỉ báo cho người dùng, việc mua thêm làm ở nút Account (góc phải trên). */
+/* Hộp thoại "Hết credits": dùng lại kiểu <dialog> của "Please upload the source image!" */
+let outOfCreditsDialog = null;
+function ensureOutOfCreditsDialog() {
+  if (outOfCreditsDialog) return outOfCreditsDialog;
+  const dlg = document.createElement("dialog");
+  dlg.className = "forge-source-required-dialog forge-credits-dialog";
+  dlg.setAttribute("aria-labelledby", "forge-credits-title");
+  dlg.setAttribute("aria-describedby", "forge-credits-description");
+  dlg.innerHTML = `
+    <div class="forge-source-required-card">
+      <span class="forge-source-required-icon" aria-hidden="true">${ICON.coin}</span>
+      <strong id="forge-credits-title">You’re out of credits!</strong>
+      <span id="forge-credits-description">Each 3D generation costs 1 credit. Buy more credits to keep creating.</span>
+      <form method="dialog" class="forge-credits-actions">
+        <button class="forge-source-required-dismiss" type="submit" value="later">Maybe later</button>
+        <button class="forge-credits-buy" type="submit" value="buy" autofocus>Buy credits</button>
+      </form>
+    </div>`;
+  // Bấm "Buy credits" -> đóng hộp thoại này rồi mở hộp thoại mua credits
+  dlg.addEventListener("close", () => {
+    const wantsToBuy = dlg.returnValue === "buy";
+    dlg.returnValue = "";
+    if (wantsToBuy) openBuyCredits({ reason: "out-of-credits" });
+  });
+  document.body.appendChild(dlg);
+  outOfCreditsDialog = dlg;
+  return dlg;
+}
+/** Hết credits: hiện hộp thoại báo hết credit kèm nút mua thêm. */
 export function notifyOutOfCredits() {
-  toast("You’ve run out of credits. Buy more from the Account button (top right) to keep creating.", "error", 6500);
+  const dlg = ensureOutOfCreditsDialog();
+  if (!dlg.open) dlg.showModal();
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,7 +160,7 @@ function ensureModal() {
       <p class="bill-hint"></p>
       <p class="bill-error" role="alert" hidden></p>
       <button class="bill-pay" type="button" disabled>Pay</button>
-      <p class="bill-foot">1 credit = 1 Magic Wand 3D object. Credits never expire. If a generation fails, your credit is refunded automatically.</p>
+      <p class="bill-foot">1 credit = 1 3D generation (Single object, Multiple objects scene, or one Magic Wand object). Credits never expire. If a generation fails, your credit is refunded automatically.</p>
     </section>`;
   document.body.appendChild(root);
 
@@ -219,7 +248,7 @@ export async function openBuyCredits({ reason } = {}) {
   const root = ensureModal();
   const banner = root.querySelector(".bill-banner");
   banner.hidden = reason !== "out-of-credits";
-  banner.textContent = "You’ve run out of Magic Wand credits. Top up to keep creating.";
+  banner.textContent = "You’ve run out of credits. Top up to keep creating.";
   root.querySelector(".bill-error").hidden = true;
   root.querySelector(".bill-pay").dataset.busy = "0";
   root.classList.remove("is-closing");

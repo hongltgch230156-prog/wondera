@@ -556,7 +556,18 @@ function buildScene() {
       front.position.set(-1.25, 0, 0.075);
       const back = front.clone(); back.position.z = -0.075; back.rotation.y = Math.PI;   // đọc được cả hai mặt
       sign.add(front, back);
-      sign.position.set(-0.16, 3.7 - i * 0.82, 0);
+      // Thanh đỡ nối bảng với cột
+      const support = rbox(
+          0.28,
+          0.12,
+          0.12,
+          0.04,
+          wood
+      );
+
+      support.position.set(-0.05, 0, -0.02);
+      sign.add(support);
+      sign.position.set(-0.05, 3.7 - i * 0.82, 0);
       post.add(sign);
     });
     post.position.set(-2.2, 0, 3.0);

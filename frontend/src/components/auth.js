@@ -224,7 +224,7 @@ function buildMarkup() {
           <div class="auth-label-row"><label class="auth-label" for="auth-email">Email</label></div>
           <div class="auth-field" data-field="auth-email">
             ${ICONS.mail}
-            <input class="auth-input" id="auth-email" name="email" type="email" placeholder="ban@wondera.app"
+            <input class="auth-input" id="auth-email" name="email" type="email" placeholder="you@wondera.app"
                    autocomplete="email" inputmode="email" style="padding-right:16px" />
           </div>
         </div>
@@ -244,7 +244,7 @@ function buildMarkup() {
           <div class="auth-label-row"><label class="auth-label" for="auth-reset-email">Email</label></div>
           <div class="auth-field" data-field="auth-reset-email">
             ${ICONS.mail}
-            <input class="auth-input" id="auth-reset-email" type="email" placeholder="ban@wondera.app"
+            <input class="auth-input" id="auth-reset-email" type="email" placeholder="you@wondera.app"
                    autocomplete="email" inputmode="email" style="padding-right:16px" />
           </div>
         </div>

@@ -9,15 +9,23 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Transaction = require('../models/Transaction');
-const { FREE_CREDITS } = require('../config/pricing');
+const mongoose = require('mongoose');
+const { FREE_CREDITS, LEGACY_FREE_CREDITS, NEW_FREE_CREDITS_FROM } = require('../config/pricing');
 
 const AFTER = { returnDocument: 'after' }; // trả về tài liệu sau khi cập nhật
 
 /** Khởi tạo ví lần đầu: tặng FREE_CREDITS. Chạy an toàn nhiều lần (chỉ lần đầu có tác dụng). */
+// Số credits tặng: tài khoản tạo trước NEW_FREE_CREDITS_FROM -> 2 (như cũ), sau đó -> 4.
+// Thời điểm tạo tài khoản lấy từ chính _id của MongoDB nên không cần thêm trường nào.
+const welcomeAmount = (userId) => {
+  const createdAt = new mongoose.Types.ObjectId(String(userId)).getTimestamp();
+  return createdAt < NEW_FREE_CREDITS_FROM ? LEGACY_FREE_CREDITS : FREE_CREDITS;
+};
 async function ensureWallet(userId) {
+  const amount = welcomeAmount(userId);
   const res = await User.updateOne(
     { _id: userId, credits: { $exists: false } },
-    { $set: { credits: FREE_CREDITS } }
+    { $set: { credits: amount } }
   );
   if (res.modifiedCount === 1) {
     try {
@@ -25,8 +33,8 @@ async function ensureWallet(userId) {
         user: userId,
         key: `bonus:${userId}`,
         type: 'bonus',
-        delta: FREE_CREDITS,
-        balanceAfter: FREE_CREDITS,
+        delta: amount,
+        balanceAfter: amount,
         note: 'Welcome bonus',
       });
     } catch (e) {

@@ -281,10 +281,71 @@
   object-fit: contain;
   display: none;
   z-index: 1;
+  background: #fff;
+  object-position: center;
 }
 .forge-upload-card.is-filled .forge-preview {
   display: block;
 }
+
+/* Compact cancel button */
+.forge-clear-upload-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+
+  width: 26px;
+  height: 26px;
+  padding: 0;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  border: 2px solid #fff;
+  border-radius: 50%;
+
+  background: rgba(108, 63, 124, 0.92);
+  color: #fff;
+
+  cursor: pointer;
+  line-height: 0;
+
+  box-shadow: 0 2px 6px rgba(65, 35, 85, 0.2);
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.forge-upload-card.is-filled .forge-clear-upload-btn {
+  display: flex;
+}
+
+.forge-clear-upload-btn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.forge-clear-upload-btn:hover {
+  background: #8b5ba3;
+  transform: scale(1.08);
+  box-shadow: 0 3px 8px rgba(65, 35, 85, 0.3);
+}
+
+.forge-clear-upload-btn:active {
+  transform: scale(0.94);
+}
+
+.forge-clear-upload-btn:focus-visible {
+  outline: 2px solid rgba(108, 63, 124, 0.4);
+  outline-offset: 3px;
+}
+
 .forge-selection-preview {
   position: absolute;
   inset: 0;
@@ -1131,10 +1192,11 @@
 .multiple-mode-active .forge-upload-card.required {
   min-height: clamp(280px, 36vh, 340px);
 }
-.forge-upload-card.required .forge-preview,
-.multiple-mode-active .forge-upload-card.required .forge-selection-preview {
-  object-fit: cover;
-  object-position: center;
+/* Keep the entire uploaded image visible */
+.forge-upload-card .forge-preview,
+.forge-upload-card .forge-selection-preview {
+  object-fit: contain !important;
+  object-position: center center !important;
 }
 .multiple-mode-active .forge-helper-text {
   margin: 12px 0;
@@ -1222,4 +1284,47 @@
   .forge-auto-rotate-toggle.is-on::after {
     transform: translateX(14px);
   }
+}
+
+/* ---------- Hộp thoại hết credits (dùng chung kiểu với .forge-source-required-*) ---------- */
+.forge-credits-dialog .forge-credits-actions {
+  display: flex;
+  gap: 10px;
+}
+.forge-credits-dialog .forge-source-required-dismiss {
+  flex: 1;
+  width: auto;
+}
+.forge-credits-buy {
+  flex: 1.3;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 2px solid vars.$base-purple;
+  border-radius: 14px;
+  background: vars.$base-purple;
+  color: #fff;
+  font-family: 'Baloo 2', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+.forge-credits-buy:hover,
+.forge-credits-buy:focus-visible {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+.forge-credits-buy:focus-visible {
+  outline: 3px solid rgba(110, 94, 156, 0.35);
+  outline-offset: 3px;
+}
+@media (max-width: 380px) {
+  .forge-credits-dialog .forge-credits-actions {
+    flex-direction: column-reverse;
+  }
+}
+/* Đảm bảo hộp thoại "Buy credits" luôn nằm TRÊN cửa sổ 3D Forge */
+body > .bill-root {
+  z-index: 2147483000;
 }

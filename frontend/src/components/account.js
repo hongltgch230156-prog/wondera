@@ -495,7 +495,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
         <div class="account-plan-icon">${IC.coin}</div>
         <div class="account-plan-text">
           <p class="account-plan-title">Credits</p>
-          <p class="account-plan-sub">1 credit = 1 Magic Wand 3D object</p>
+          <p class="account-plan-sub">1 credit = 1 3D generation</p>
         </div>
         <div class="account-credits-balance"><strong>${w.credits === null || w.credits === undefined ? "–" : esc(w.credits)}</strong><span>credits</span></div>
         <button class="account-pill account-buy" type="button" data-act="buy-credits">${IC.coin}<span>Buy credits</span></button>

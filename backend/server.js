@@ -57,11 +57,27 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // --- API 1: Xử lý tạo Task (Tất cả đều dùng Trellis-2, Multiple có thêm bước lót nền trắng) ---
 app.post('/api/create-task', upload.fields([{ name: 'source', maxCount: 1 }, { name: 'pose', maxCount: 1 }]), async (req, res) => {
+  let usageKey = null;
   try {
     const mode = req.body.mode;
     const sourceFile = req.files['source']?.[0];
     const poseFile = req.files['pose']?.[0];
     if (!sourceFile) throw new Error("Thiếu ảnh nguồn bắt buộc");
+    if (mode !== 'single' && mode !== 'multiple') throw new Error("Invalid mode");
+    // Trừ credit TRƯỚC khi gọi AI (an toàn khi nhiều request cùng lúc). Hết credit -> 402.
+    const paid = await credits.debit(
+      req.user._id,
+      mode === 'multiple' ? COSTS.multiple : COSTS.single,
+      { note: mode === 'multiple' ? 'Multiple objects scene' : 'Single object' }
+    );
+    if (!paid.ok) {
+      return res.status(402).json({
+        error: 'You have run out of credits.',
+        code: 'INSUFFICIENT_CREDITS',
+        credits: paid.balance,
+      });
+    }
+    usageKey = paid.key;
     
     let finalBuffer = sourceFile.buffer;
     let finalMime = sourceFile.mimetype;
@@ -127,10 +143,16 @@ app.post('/api/create-task', upload.fields([{ name: 'source', maxCount: 1 }, { n
     const endpoint = "fal-ai/trellis-2";
 
     // Cấu hình thông số mặc định
-    let trellisInput = { 
+    let trellisInput = {
       image_url: finalBase64,
-      // Ép texture (vân bề mặt) luôn xuất ra ở độ phân giải cao nhất
-      texture_size: 1024 
+      resolution: 1536,              // chi tiết hình khối cao nhất fal cho phép
+      texture_size: 4096,            // texture nét nhất
+      decimation_target: 1000000,    // giữ nhiều đỉnh hơn (mặc định 500000)
+      remesh: true,
+      remesh_project: 1,             // quan trọng: chiếu đỉnh về bề mặt gốc, hạn chế lọt màu
+      ss_sampling_steps: 20,         // mặc định 12
+      shape_slat_sampling_steps: 20,
+      tex_slat_sampling_steps: 20,
     };
 
     if (mode === 'single') {
@@ -140,6 +162,7 @@ app.post('/api/create-task', upload.fields([{ name: 'source', maxCount: 1 }, { n
     const { request_id } = await fal.queue.submit(endpoint, {
       input: trellisInput
     });
+    await credits.attachTask(usageKey, request_id); // để task-status hoàn credit nếu AI báo lỗi
 
     // Ghi lại model này cho trang Account (không bao giờ ném lỗi)
     await trackModelTask(req.user._id, request_id, {
@@ -148,8 +171,10 @@ app.post('/api/create-task', upload.fields([{ name: 'source', maxCount: 1 }, { n
       thumbBuffer: finalBuffer,
     });
 
-    res.json({ code: 0, data: { task_id: request_id } });
+    res.json({ code: 0, data: { task_id: request_id, credits: paid.balance } });
   } catch (error) {
+    // Chưa gửi được lên AI -> trả lại credit đã trừ
+    if (usageKey) await credits.refundUsage(usageKey, 'could not start generation').catch(() => {});
     console.error("Lỗi Create Task:", error);
     res.status(500).json({ error: error.message });
   }
@@ -447,7 +472,7 @@ app.post('/api/magic-wand/create', async (req, res) => {
     const paid = await credits.debit(req.user._id, COSTS.magicWandObject, { note: 'Magic Wand object' });
     if (!paid.ok) {
       return res.status(402).json({
-        error: 'Bạn đã hết credits Magic Wand.',
+        error: 'You have run out of credits.',
         code: 'INSUFFICIENT_CREDITS',
         credits: paid.balance,
       });
