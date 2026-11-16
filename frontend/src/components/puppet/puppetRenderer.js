@@ -310,143 +310,190 @@ export function drawPuppet(ctx, sprite, pose, { alpha = 1, flash = 0 } = {}) {
 
 /** Vẽ vợt / vũ khí / khiên theo frame từ poseSolver.equipmentFrame */
 export function drawEquipment(ctx, img, spec, frame, glow = 0) {
-  ctx.save();
-  ctx.translate(frame.grip.x, frame.grip.y);
-  ctx.rotate(frame.angle);
-  ctx.scale(frame.k, frame.k);
-  if (glow > 0) { ctx.shadowColor = "rgba(255,230,140,.95)"; ctx.shadowBlur = 28 * glow; }
-  ctx.drawImage(img, -spec.grip[0], -spec.grip[1]);
-  ctx.restore();
+  ctx.save();
+  ctx.translate(frame.grip.x, frame.grip.y);
+  ctx.rotate(frame.angle);
+  ctx.scale(frame.k, frame.k);
+  if (glow > 0) { ctx.shadowColor = "rgba(255,230,140,.95)"; ctx.shadowBlur = 28 * glow; }
+  ctx.drawImage(img, -spec.grip[0], -spec.grip[1]);
+  ctx.restore();
 }
 /* ------------------------------------------------------------------ */
-/*  Bóng bàn tay + sợi dây                                             */
+/*  Bóng bàn tay + sợi dây                                             */
 /* ------------------------------------------------------------------ */
 const CHAINS = [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [0, 17, 18, 19, 20]];
 const PALM = [0, 1, 5, 9, 13, 17];
+let hsCanvas = null;                       // canvas nhỏ dùng chung để "làm nhòe" bóng bàn tay (thay cho ctx.filter = blur)
+const HS_SIZE = 640, HS_Q = 0.22;          // vùng 640x640 px sân khấu quanh bàn tay, vẽ ở 22% kích thước rồi phóng to -> tự nhòe
+
 /** pts: 21 điểm {x,y} đã đổi sang toạ độ sân khấu; unit: độ dày nét (px) */
 export function drawHandShadow(ctx, pts, unit, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = 0.26 * alpha;
-  ctx.fillStyle = ctx.strokeStyle = "#4a2a14";
-  ctx.lineCap = ctx.lineJoin = "round";
-  try { ctx.filter = "blur(3px)"; } catch { /* trình duyệt không hỗ trợ filter */ }
-  ctx.beginPath(); PALM.forEach((i, n) => (n ? ctx.lineTo(pts[i].x, pts[i].y) : ctx.moveTo(pts[i].x, pts[i].y))); ctx.closePath(); ctx.fill();
-  ctx.lineWidth = unit * 0.9; ctx.stroke();
-  CHAINS.forEach((ch, fi) => {
-    ctx.lineWidth = unit * (fi === 0 ? 0.62 : 0.5);
-    ctx.beginPath(); ch.forEach((i, n) => (n ? ctx.lineTo(pts[i].x, pts[i].y) : ctx.moveTo(pts[i].x, pts[i].y))); ctx.stroke();
-  });
-  ctx.restore();
+  if (!hsCanvas) { hsCanvas = document.createElement("canvas"); hsCanvas.width = hsCanvas.height = Math.ceil(HS_SIZE * HS_Q); }
+  let cx = 0, cy = 0;
+  for (const p of pts) { cx += p.x; cy += p.y; }
+  const bx = cx / pts.length - HS_SIZE / 2, by = cy / pts.length - HS_SIZE / 2;
+  const g = hsCanvas.getContext("2d");
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, hsCanvas.width, hsCanvas.height);
+  g.setTransform(HS_Q, 0, 0, HS_Q, -bx * HS_Q, -by * HS_Q);
+  g.fillStyle = g.strokeStyle = "#4a2a14";
+  g.lineCap = g.lineJoin = "round";
+  g.beginPath(); PALM.forEach((i, n) => (n ? g.lineTo(pts[i].x, pts[i].y) : g.moveTo(pts[i].x, pts[i].y))); g.closePath(); g.fill();
+  g.lineWidth = unit * 0.9; g.stroke();
+  CHAINS.forEach((ch, fi) => {
+    g.lineWidth = unit * (fi === 0 ? 0.62 : 0.5);
+    g.beginPath(); ch.forEach((i, n) => (n ? g.lineTo(pts[i].x, pts[i].y) : g.moveTo(pts[i].x, pts[i].y))); g.stroke();
+  });
+  ctx.save();
+  ctx.globalAlpha = 0.28 * alpha;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(hsCanvas, bx, by, HS_SIZE, HS_SIZE);
+  ctx.restore();
 }
 /** Dây từ đầu ngón (bóng) tới khớp của con rối: [{from:{x,y}, to:{x,y}}] */
 export function drawStrings(ctx, strings, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = 0.55 * alpha;
-  ctx.strokeStyle = "#5b3516"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
-  for (const s of strings) {
-    const midY = (s.from.y + s.to.y) / 2, sag = Math.min(14, Math.abs(s.to.x - s.from.x) * 0.08);
-    ctx.beginPath(); ctx.moveTo(s.from.x, s.from.y);
-    ctx.quadraticCurveTo((s.from.x + s.to.x) / 2, midY + sag, s.to.x, s.to.y); ctx.stroke();
-    ctx.fillStyle = "#7a4a1f"; ctx.beginPath(); ctx.arc(s.to.x, s.to.y, 3.2, 0, 6.283); ctx.fill();
-  }
-  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = 0.55 * alpha;
+  ctx.strokeStyle = "#5b3516"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+  for (const s of strings) {
+    const midY = (s.from.y + s.to.y) / 2, sag = Math.min(14, Math.abs(s.to.x - s.from.x) * 0.08);
+    ctx.beginPath(); ctx.moveTo(s.from.x, s.from.y);
+    ctx.quadraticCurveTo((s.from.x + s.to.x) / 2, midY + sag, s.to.x, s.to.y); ctx.stroke();
+    ctx.fillStyle = "#7a4a1f"; ctx.beginPath(); ctx.arc(s.to.x, s.to.y, 3.2, 0, 6.283); ctx.fill();
+  }
+  ctx.restore();
 }
 /* ------------------------------------------------------------------ */
-/*  Quả cầu                                                            */
+/*  Quả cầu                                                            */
 /* ------------------------------------------------------------------ */
 export function drawBall(ctx, ball, img) {
-  const r = PHYSICS.BALL_R;
-  // bóng đổ trên mặt bàn
-  const overTable = ball.x > LAYOUT.TABLE_L && ball.x < LAYOUT.TABLE_R;
-  const sy = overTable ? LAYOUT.TABLE_Y : LAYOUT.FLOOR_Y;
-  const h = Math.max(0, sy - ball.y);
-  ctx.save();
-  ctx.globalAlpha = Math.max(0.08, 0.32 - h / 1400);
-  ctx.fillStyle = "#3b2208";
-  ctx.beginPath(); ctx.ellipse(ball.x, sy + 6, r * (1.2 - h / 1500), r * 0.34, 0, 0, 6.283); ctx.fill();
-  ctx.restore();
-  ctx.save();
-  if (ball.glow) { ctx.shadowColor = "rgba(255,225,120,.95)"; ctx.shadowBlur = 40 * ball.glow; }
-  ctx.translate(ball.x, ball.y); ctx.rotate(ball.spin || 0);
-  const d = r * 2.3;
-  if (img) ctx.drawImage(img, -d / 2, -d / 2, d, d);
-  else { ctx.fillStyle = "#ffd34d"; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill(); }
-  ctx.restore();
+  const r = PHYSICS.BALL_R;
+  // bóng đổ trên mặt bàn
+  const overTable = ball.x > LAYOUT.TABLE_L && ball.x < LAYOUT.TABLE_R;
+  const sy = overTable ? LAYOUT.TABLE_Y : LAYOUT.FLOOR_Y;
+  const h = Math.max(0, sy - ball.y);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.08, 0.32 - h / 1400);
+  ctx.fillStyle = "#3b2208";
+  ctx.beginPath(); ctx.ellipse(ball.x, sy + 6, r * (1.2 - h / 1500), r * 0.34, 0, 0, 6.283); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  if (ball.glow) { ctx.shadowColor = "rgba(255,225,120,.95)"; ctx.shadowBlur = 40 * ball.glow; }
+  ctx.translate(ball.x, ball.y); ctx.rotate(ball.spin || 0);
+  const d = r * 2.3;
+  if (img) ctx.drawImage(img, -d / 2, -d / 2, d, d);
+  else { ctx.fillStyle = "#ffd34d"; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill(); }
+  ctx.restore();
 }
 /* ------------------------------------------------------------------ */
-/*  Sân khấu                                                           */
+/*  Sân khấu                                                           */
 /* ------------------------------------------------------------------ */
+/** Vũ khí đang BAY (đã rời tay): xoay quanh tâm thân vũ khí, mũi hướng theo angle (0 = mũi hướng lên). w = {x,y,angle,k,glow} */
+export function drawThrownWeapon(ctx, img, spec, w) {
+  if (!img || !spec) return;
+  const mid = spec.tip ? [(spec.grip[0] + spec.tip[0]) / 2, (spec.grip[1] + spec.tip[1]) / 2] : spec.grip;
+  ctx.save();
+  ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.scale(w.k, w.k);
+  if (w.glow) { ctx.shadowColor = "rgba(255,236,170,0.95)"; ctx.shadowBlur = (26 * w.glow) / Math.max(0.2, w.k); }
+  ctx.drawImage(img, -mid[0], -mid[1]);
+  ctx.restore();
+}
+/** Vệt sáng sau vũ khí đang bay */
+export function drawWeaponTrail(ctx, trail, k = 0.55, alpha = 1) {
+  if (!trail || trail.length < 2) return;
+  ctx.save(); ctx.lineCap = "round";
+  for (let i = 1; i < trail.length; i++) {
+    const t = i / trail.length;
+    ctx.strokeStyle = `rgba(255,246,206,${0.5 * t * t * alpha})`; ctx.lineWidth = 2 + 20 * t * k;
+    ctx.beginPath(); ctx.moveTo(trail[i - 1].x, trail[i - 1].y); ctx.lineTo(trail[i].x, trail[i].y); ctx.stroke();
+  }
+  ctx.restore();
+}
 export class StageRenderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
-    this.bg = null;
-    this.s = 1; this.ox = 0; this.oy = 0;
-    this.resize();
-  }
-  async loadBackground(url = STAGE.BG_URL) {
-    try {
-      this.bg = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    } catch { this.bg = null; }
-  }
-  resize() {
-    const r = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
-    if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
-    // "cover": phủ kín khung, cắt phần thừa
-    this.s = Math.max(w / STAGE.W, h / STAGE.H);
-    this.ox = (w - STAGE.W * this.s) / 2; this.oy = (h - STAGE.H * this.s) / 2;
-  }
-  /** pixel màn hình -> toạ độ sân khấu */
-  toStage(clientX, clientY) {
-    const r = this.canvas.getBoundingClientRect(), dpr = this.canvas.width / r.width;
-    return { x: ((clientX - r.left) * dpr - this.ox) / this.s, y: ((clientY - r.top) * dpr - this.oy) / this.s };
-  }
-  _drawBackground(ctx, dim) {
-    if (this.bg) ctx.drawImage(this.bg, 0, 0, STAGE.W, STAGE.H);
-    else {
-      const g = ctx.createLinearGradient(0, 0, 0, STAGE.H);
-      g.addColorStop(0, "#cdbbe6"); g.addColorStop(0.55, "#f7e4c4"); g.addColorStop(1, "#d9a86a");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, STAGE.W, STAGE.H);
-      ctx.fillStyle = "#b27a3e"; ctx.fillRect(LAYOUT.TABLE_L, LAYOUT.TABLE_Y, LAYOUT.TABLE_R - LAYOUT.TABLE_L, 34);
-      ctx.fillStyle = "#8a5a2c"; ctx.fillRect(LAYOUT.NET_X - 9, LAYOUT.NET_TOP, 18, LAYOUT.TABLE_Y - LAYOUT.NET_TOP);
-    }
-    if (dim > 0) { ctx.fillStyle = `rgba(40,16,50,${dim})`; ctx.fillRect(0, 0, STAGE.W, STAGE.H); }
-  }
-  /**
-   * scene = {
-   *   dim, shake:{x,y}, hand:{pts,unit,alpha}|null, strings:[],
-   *   puppets:[{sprite,pose,alpha,flash, equip:[{img,spec,frame,glow}]}] (vẽ theo thứ tự),
-   *   ball:{...}, ballImg, fx:Effects, overlayGlow
-   * }
-   */
-  render(scene) {
-    this.resize();
-    const ctx = this.ctx;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const sh = scene.shake || { x: 0, y: 0 };
-    ctx.setTransform(this.s, 0, 0, this.s, this.ox + sh.x * this.s, this.oy + sh.y * this.s);
-    this._drawBackground(ctx, scene.dim || 0);
-    if (scene.hand) drawHandShadow(ctx, scene.hand.pts, scene.hand.unit, scene.hand.alpha ?? 1);
-    if (scene.strings?.length) drawStrings(ctx, scene.strings, scene.hand?.alpha ?? 1);
-    // bóng đổ dưới chân
-    for (const p of scene.puppets || []) {
-      const fy = LAYOUT.FLOOR_Y + 8;
-      ctx.save(); ctx.globalAlpha = 0.22 * (p.alpha ?? 1); ctx.fillStyle = "#3b2208";
-      ctx.beginPath(); ctx.ellipse(p.pose.joints.hip.x, fy, 70 * Math.max(0.5, 1 - Math.max(0, fy - 150 - p.pose.joints.ankleR.y) / 600), 14, 0, 0, 6.283); ctx.fill(); ctx.restore();
-    }
-    for (const p of scene.puppets || []) {
-      drawPuppet(ctx, p.sprite, p.pose, { alpha: p.alpha ?? 1, flash: p.flash || 0 });
-      for (const e of p.equip || []) drawEquipment(ctx, e.img, e.spec, e.frame, e.glow || 0);
-    }
-    if (scene.ball && scene.ball.visible !== false) drawBall(ctx, scene.ball, scene.ballImg);
-    scene.fx?.draw(ctx);
-    if (scene.overlayGlow) {
-      const g = ctx.createRadialGradient(STAGE.W / 2, STAGE.H * 0.5, 60, STAGE.W / 2, STAGE.H * 0.5, STAGE.W * 0.6);
-      g.addColorStop(0, `rgba(255,236,170,${0.18 * scene.overlayGlow})`); g.addColorStop(1, "rgba(255,236,170,0)");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, STAGE.W, STAGE.H);
-    }
-  }
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.bg = null;
+    this.s = 1; this.ox = 0; this.oy = 0;
+    this._dirty = true;                              // chỉ đo lại kích thước canvas khi nó thật sự đổi (getBoundingClientRect mỗi khung = ép layout)
+    this._poll = typeof ResizeObserver === "undefined";
+    if (!this._poll) new ResizeObserver(() => { this._dirty = true; }).observe(canvas);
+    window.addEventListener("resize", () => { this._dirty = true; });
+    this.resize(); this._dirty = false;
+  }
+  async loadBackground(url = STAGE.BG_URL) {
+    try {
+      this.bg = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    } catch { this.bg = null; }
+  }
+  resize() {
+    const r = this.canvas.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
+    if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
+    // "cover": phủ kín khung, cắt phần thừa
+    this.s = Math.max(w / STAGE.W, h / STAGE.H);
+    this.ox = (w - STAGE.W * this.s) / 2; this.oy = (h - STAGE.H * this.s) / 2;
+  }
+  /** pixel màn hình -> toạ độ sân khấu */
+  toStage(clientX, clientY) {
+    const r = this.canvas.getBoundingClientRect(), dpr = this.canvas.width / r.width;
+    return { x: ((clientX - r.left) * dpr - this.ox) / this.s, y: ((clientY - r.top) * dpr - this.oy) / this.s };
+  }
+  _drawBackground(ctx, dim) {
+    if (this.bg) ctx.drawImage(this.bg, 0, 0, STAGE.W, STAGE.H);
+    else {
+      const g = ctx.createLinearGradient(0, 0, 0, STAGE.H);
+      g.addColorStop(0, "#cdbbe6"); g.addColorStop(0.55, "#f7e4c4"); g.addColorStop(1, "#d9a86a");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, STAGE.W, STAGE.H);
+      ctx.fillStyle = "#b27a3e"; ctx.fillRect(LAYOUT.TABLE_L, LAYOUT.TABLE_Y, LAYOUT.TABLE_R - LAYOUT.TABLE_L, 34);
+      ctx.fillStyle = "#8a5a2c"; ctx.fillRect(LAYOUT.NET_X - 9, LAYOUT.NET_TOP, 18, LAYOUT.TABLE_Y - LAYOUT.NET_TOP);
+    }
+    if (dim > 0) { ctx.fillStyle = `rgba(40,16,50,${dim})`; ctx.fillRect(0, 0, STAGE.W, STAGE.H); }
+  }
+  /**
+   * scene = {
+   *   dim, shake:{x,y}, hand:{pts,unit,alpha}|null, strings:[],
+   *   puppets:[{sprite,pose,alpha,flash, equip:[{img,spec,frame,glow}]}] (vẽ theo thứ tự),
+   *   ball:{...}, ballImg, fx:Effects, overlayGlow
+   * }
+   */
+  render(scene) {
+    if (this._dirty || this._poll) { this._dirty = false; this.resize(); }
+    const ctx = this.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const sh = scene.shake || { x: 0, y: 0 };
+    ctx.setTransform(this.s, 0, 0, this.s, this.ox + sh.x * this.s, this.oy + sh.y * this.s);
+    this._drawBackground(ctx, scene.dim || 0);
+    if (scene.hand) drawHandShadow(ctx, scene.hand.pts, scene.hand.unit, scene.hand.alpha ?? 1);
+    if (scene.strings?.length) drawStrings(ctx, scene.strings, scene.hand?.alpha ?? 1);
+    // bóng đổ dưới chân: nằm đúng dưới đế giày (p.floorY = độ sâu hiện tại trên mặt sàn), co theo phối cảnh (p.k) và nhạt / nhỏ dần khi con rối rời mặt đất (p.lift)
+    for (const p of scene.puppets || []) {
+      const j = p.pose.joints, k = p.k ?? 1, fy = (p.floorY ?? LAYOUT.STAND_Y) + 1;
+      const lift = Math.min(1, Math.max(0, (p.lift || 0) / 300)), a = (p.alpha ?? 1) * (1 - 0.55 * lift), sc = 1 - 0.3 * lift;
+      const rx = 78 * k * sc, ry = 15 * k * sc, cx = j.hip.x;
+      ctx.save();
+      ctx.translate(cx, fy); ctx.scale(1, ry / rx);                 // vòng tròn -> elip dẹt (mặt sàn nhìn nghiêng)
+      const g = ctx.createRadialGradient(0, 0, rx * 0.08, 0, 0, rx);
+      g.addColorStop(0, `rgba(44,22,6,${0.40 * a})`); g.addColorStop(0.5, `rgba(44,22,6,${0.22 * a})`); g.addColorStop(1, "rgba(44,22,6,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, 6.283); ctx.fill();
+      ctx.restore();
+      // bóng tiếp xúc đậm ngay dưới hai bàn chân
+      const spread = Math.abs(j.ankleR.x - j.ankleL.x) / 2 + 34 * k * sc;
+      ctx.save(); ctx.globalAlpha = 0.30 * a; ctx.fillStyle = "#2c1606";
+      ctx.beginPath(); ctx.ellipse(cx, fy, spread, 6.5 * k * sc, 0, 0, 6.283); ctx.fill(); ctx.restore();
+    }
+    for (const p of scene.puppets || []) {
+      drawPuppet(ctx, p.sprite, p.pose, { alpha: p.alpha ?? 1, flash: p.flash || 0 });
+      for (const e of p.equip || []) drawEquipment(ctx, e.img, e.spec, e.frame, e.glow || 0);
+    }
+    if (scene.ball && scene.ball.visible !== false) drawBall(ctx, scene.ball, scene.ballImg);
+    if (scene.thrown) { drawWeaponTrail(ctx, scene.thrown.trail, scene.thrown.k); drawThrownWeapon(ctx, scene.thrown.img, scene.thrown.spec, scene.thrown); }   // vũ khí đang bay (đã rời tay)
+    scene.fx?.draw(ctx);
+    if (scene.overlayGlow) {
+      const g = ctx.createRadialGradient(STAGE.W / 2, STAGE.H * 0.5, 60, STAGE.W / 2, STAGE.H * 0.5, STAGE.W * 0.6);
+      g.addColorStop(0, `rgba(255,236,170,${0.18 * scene.overlayGlow})`); g.addColorStop(1, "rgba(255,236,170,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, STAGE.W, STAGE.H);
+    }
+  }
 }

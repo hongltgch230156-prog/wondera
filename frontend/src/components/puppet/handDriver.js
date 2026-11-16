@@ -19,6 +19,10 @@ export class HandDriver {
     this.video = opts.video || null;
     this.overlay = opts.overlay || null;
     this.onStatus = opts.onStatus || (() => {});
+    this.external = !!opts.external;   // true = vòng lặp của puppetStage tự gọi tick() mỗi khung (nhận diện + dựng tư thế + vẽ trong CÙNG một khung)
+    this.delegate = "";                // "GPU" | "CPU"
+    this.detMs = 0; this.detN = 0;     // thời gian nhận diện trung bình (ms) và số lần nhận diện (để đo)
+    this._rectT = -1e9;
     this.mode = "off";                // "off" | "camera" | "sim"
     this.landmarker = null;
     this.stream = null;
@@ -62,13 +66,13 @@ export class HandDriver {
       this.startSim();
       this.onStatus("No camera – move the mouse to control the puppet (Space = swing)", "warn");
     }
-    this._loop();
+    if (!this.external) this._loop();
     return this.mode;
   }
 
   async _startCamera() {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("getUserMedia not supported");
-    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 60 }, facingMode: "user" }, audio: false });
     if (!this.video) throw new Error("no <video> element");
     this.video.srcObject = this.stream;
     this.video.muted = true; this.video.playsInline = true;
@@ -77,14 +81,26 @@ export class HandDriver {
 
   async _loadLandmarker() {
     // import() từ CDN: không cần cài thêm package. Nếu dự án đã có @mediapipe/tasks-vision, đổi dòng này thành: import("@mediapipe/tasks-vision")
-    const vision = await import(/* @vite-ignore */ TRACKING.MODULE_URL);
-    const fileset = await vision.FilesetResolver.forVisionTasks(TRACKING.WASM_URL);
+    const vision = await import("@mediapipe/tasks-vision");
+    const fileset = await vision.FilesetResolver.forVisionTasks(new URL("../../../node_modules/@mediapipe/tasks-vision/wasm", import.meta.url).href);
     const make = (delegate) => vision.HandLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: TRACKING.MODEL_URL, delegate },
       runningMode: "VIDEO", numHands: 1,
       minHandDetectionConfidence: TRACKING.MIN_CONFIDENCE, minHandPresenceConfidence: TRACKING.MIN_CONFIDENCE, minTrackingConfidence: TRACKING.MIN_CONFIDENCE,
     });
-    try { this.landmarker = await make("GPU"); } catch { this.landmarker = await make("CPU"); }
+    //try { this.landmarker = await make("GPU"); } catch { this.landmarker = await make("CPU"); }
+    try { this.landmarker = await make("GPU"); this.delegate = "GPU"; }
+    catch (e) { console.warn("[HandDriver] GPU delegate failed, falling back to CPU:", e); this.landmarker = await make("CPU"); this.delegate = "CPU"; }
+    console.log("[HandDriver] delegate:", this.delegate);
+
+    // đo tốc độ: in ra Console mỗi giây, cùng kiểu với Snap & Solve
+    const rawDetect = this.landmarker.detectForVideo.bind(this.landmarker);
+    let n = 0, ms = 0, t0 = performance.now();
+    this.landmarker.detectForVideo = (...a) => {
+      const t = performance.now(); const r = rawDetect(...a); ms += performance.now() - t; n++;
+      if (performance.now() - t0 >= 1000) { console.log(`puppet tracking ${n} fps, ${(ms / n).toFixed(1)} ms/frame`); n = 0; ms = 0; t0 = performance.now(); }
+      return r;
+    };
   }
 
   _stopCamera() {
@@ -107,18 +123,28 @@ export class HandDriver {
   /* ---------------------------------------------------------------- */
   _loop = () => {
     if (!this.running) return;
+    this.tick();
+    this.raf = requestAnimationFrame(this._loop);
+  };
+
+  /** Một nhịp xử lý: nhận diện (khi camera có khung mới) rồi vẽ khung xương. */
+  tick() {
+    if (!this.running) return;
     const now = performance.now();
+    let fresh = false;
     if (this.mode === "camera" && this.landmarker && this.video?.readyState >= 2 && this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
       const res = this.landmarker.detectForVideo(this.video, now);
+      this.detMs += (performance.now() - now - this.detMs) * 0.1; this.detN++;
       const pts = res?.landmarks?.[0];
       if (pts) this._ingest(pts, now); else this._missing(now);
+      fresh = true;
     } else if (this.mode === "sim") {
       this._ingest(this._simLandmarks(now), now, true);
+      fresh = true;
     }
-    this._drawOverlay();
-    this.raf = requestAnimationFrame(this._loop);
-  };
+    if (fresh) this._drawOverlay();      // chỉ vẽ lại khung xương khi có dữ liệu mới (trước đây vẽ ở MỌI khung hình)
+  }
 
   _missing(now) {
     if (this.present && now - this.lastSeen > TRACKING.LOST_MS) { this.present = false; this._prevRing = null; this._hist.length = 0; this.swingLevel = 0; }
@@ -207,8 +233,12 @@ export class HandDriver {
   }
   _drawOverlay() {
     const c = this.overlay; if (!c) return;
-    const r = c.getBoundingClientRect();
-    if (c.width !== Math.round(r.width) || c.height !== Math.round(r.height)) { c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    const tNow = performance.now();
+    if (tNow - this._rectT > 500) {                     // đo kích thước (buộc trình duyệt tính layout) tối đa 2 lần / giây
+      this._rectT = tNow;
+      const r = c.getBoundingClientRect();
+      if (c.width !== Math.round(r.width) || c.height !== Math.round(r.height)) { c.width = Math.round(r.width); c.height = Math.round(r.height); }
+    }
     const g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
     if (!this.present) return;
     // video dùng object-fit: cover => đổi toạ độ chuẩn hoá của camera sang toạ độ khung

@@ -1,11 +1,9 @@
 // frontend/src/components/puppet/puppetEffects.js
 // Hiệu ứng nhỏ vẽ trên canvas sân khấu: vòng sáng khi đánh trúng, tia lấp lánh, mảnh giấy vỡ khi kết liễu.
 const rnd = (a, b) => a + Math.random() * (b - a);
-
 export class Effects {
   constructor() { this.list = []; }
   clear() { this.list.length = 0; }
-
   /** vòng sáng + tia khi vợt chạm quả cầu */
   hit(x, y, power = 1, color = "#fff1b0") {
     this.list.push({ k: "ring", x, y, t: 0, dur: 0.35, r0: 14, r1: 70 + 40 * power, color });
@@ -17,6 +15,26 @@ export class Effects {
   /** nảy trên mặt bàn */
   bounce(x, y) {
     for (let i = 0; i < 5; i++) this.list.push({ k: "spark", x, y, vx: rnd(-160, 160), vy: rnd(-220, -60), t: 0, dur: rnd(0.2, 0.4), r: rnd(1.5, 3), color: "#f8e1b0" });
+  }
+  /** tia lửa dọc đường bay của vũ khí */
+  trail(x, y, color = "#fff1b0") {
+    this.list.push({ k: "spark", x, y, vx: rnd(-40, 40), vy: rnd(-40, 40), t: 0, dur: rnd(0.18, 0.34), r: rnd(2, 4), color, g: 0 });
+  }
+  /** vũ khí va vào khiên / thân đối thủ: vòng sáng lớn + chùm tia bắn theo hướng ngược lại với hướng bay */
+  clash(x, y, dir = -1, color = "#fff6c8") {
+    this.list.push({ k: "ring", x, y, t: 0, dur: 0.42, r0: 18, r1: 120, color });
+    this.list.push({ k: "ring", x, y, t: 0, dur: 0.28, r0: 8, r1: 64, color: "#ffd27a" });
+    for (let i = 0; i < 16; i++) {
+      const a = (dir < 0 ? Math.PI : 0) + rnd(-1.0, 1.0), sp = rnd(260, 620);
+      this.list.push({ k: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, t: 0, dur: rnd(0.25, 0.55), r: rnd(2.5, 5), color: i % 3 ? color : "#ffb347" });
+    }
+  }
+  /** bụi tung lên khi con rối tiếp đất (k = tỉ lệ phối cảnh) */
+  dust(x, y, k = 1) {
+    for (let i = 0; i < 12; i++) {
+      const side = i % 2 ? 1 : -1;
+      this.list.push({ k: "spark", x: x + side * rnd(10, 46) * k, y: y - rnd(0, 4), vx: side * rnd(50, 180) * k, vy: rnd(-90, -20), t: 0, dur: rnd(0.35, 0.65), r: rnd(5, 11) * k, color: "rgba(236,214,180,0.9)", g: 60 });
+    }
   }
   /** chữ nổi lên (ví dụ "+13") */
   float(x, y, text, color = "#fff") {
@@ -39,7 +57,6 @@ export class Effects {
       this.list.push({ k: "shard", x: rnd(0, W), y: rnd(-200, -10), vx: rnd(-60, 60), vy: rnd(120, 340), rot: rnd(0, 6.283), vr: rnd(-4, 4), w: rnd(10, 22), h: rnd(6, 14), t: 0, dur: rnd(2.5, 4), color: palette[(Math.random() * palette.length) | 0], g: 0 });
     }
   }
-
   update(dt) {
     for (const e of this.list) {
       e.t += dt;
@@ -51,7 +68,6 @@ export class Effects {
     }
     this.list = this.list.filter((e) => e.t < e.dur);
   }
-
   draw(ctx) {
     for (const e of this.list) {
       const p = e.t / e.dur;

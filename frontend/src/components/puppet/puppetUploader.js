@@ -40,13 +40,13 @@ export function createUploader(host, { onUse } = {}) {
       <aside class="ps-up-guide">
         <h4>HOW TO PREPARE THE PICTURE</h4>
         <div class="ps-up-examples">${EXAMPLES.map((e) => `<figure class="ps-ex ${e.ok ? "is-ok" : "is-bad"}"><div class="ps-ex-pic">${e.html}<span class="ps-ex-badge">${e.ok ? "✓" : "✕"}</span></div><figcaption>${e.label}</figcaption></figure>`).join("")}</div>
-        <ul class="ps-up-rules">
-          <li>Full body, standing, front view</li>
-          <li><b>T-pose</b>: arms stretched out sideways</li>
-          <li>Head, both arms and both legs visible – legs <b>not</b> touching</li>
-          <li>Transparent or plain white background</li>
-          <li>At least ${PUPPET_VIEW.MIN_SIDE}px on the short side (PNG is best)</li>
-        </ul>
+        <div class="ps-up-rules" role="list">
+          <div role="listitem">Full body, standing, front view</div>
+          <div role="listitem"><b>T-pose</b>: arms stretched out sideways</div>
+          <div role="listitem">Head, both arms and both legs visible – legs <b>not</b> touching</div>
+          <div role="listitem">Transparent or plain white background</div>
+          <div role="listitem">At least ${PUPPET_VIEW.MIN_SIDE}px on the short side (PNG is best)</div>
+        </div>
       </aside>
       <section class="ps-up-work">
         <div class="ps-up-drop" data-drop tabindex="0">
@@ -66,7 +66,7 @@ export function createUploader(host, { onUse } = {}) {
           </div>
           <section class="ps-report" data-report hidden aria-live="polite">
             <header class="ps-report-head"><span class="ps-report-title">PICTURE CHECK</span><span class="ps-report-chip" data-chip></span></header>
-            <ul class="ps-report-list" data-checks></ul>
+            <div class="ps-report-list" data-checks role="list"></div>
           </section>
           <div class="ps-up-row">
             <label class="ps-up-field">Name <input type="text" maxlength="24" data-name placeholder="My Puppet" /></label>
@@ -95,15 +95,43 @@ export function createUploader(host, { onUse } = {}) {
   function showAnalyzing() {
     el.report.hidden = false; el.report.dataset.state = "busy"; delete el.report.dataset.level;
     el.chip.textContent = "Analysing…";
-    el.checks.innerHTML = BUSY_STEPS.map((t, n) => `<li class="ps-ck is-busy" style="--i:${n}"><span class="ps-ck-ico"><i class="ps-spin"></i></span><span class="ps-ck-txt">${t}…</span></li>`).join("");
+    el.checks.innerHTML = BUSY_STEPS.map((t, n) =>
+      `<div role="listitem" class="ps-ck is-busy" style="--i:${n}">
+        <span class="ps-ck-ico"><i class="ps-spin"></i></span>
+        <span class="ps-ck-txt">${t}…</span>
+      </div>`
+    ).join("");
   }
   /** Có kết quả: từng dòng hiện dần (CSS animation-delay theo --i), cuối cùng huy hiệu tổng kết hiện ra */
+  const RANK = { error: 0, warn: 1, ok: 2 };
   function showReport(items) {
-    const worst = items.some((i) => i.level === "error") ? "error" : items.some((i) => i.level === "warn") ? "warn" : "ok";
-    el.report.hidden = false; el.report.dataset.state = "done"; el.report.dataset.level = worst;
+    items = items.slice().sort(
+      (a, b) => RANK[a.level] - RANK[b.level]
+    );
+
+    const worst = items.some((i) => i.level === "error")
+      ? "error"
+      : items.some((i) => i.level === "warn")
+        ? "warn"
+        : "ok";
+
+    el.report.hidden = false;
+    el.report.dataset.state = "done";
+    el.report.dataset.level = worst;
+
     el.report.style.setProperty("--n", items.length);
-    el.chip.textContent = worst === "ok" ? "All good" : worst === "warn" ? "Almost there" : "Needs a fix";
-    el.checks.innerHTML = items.map((i, n) => `<li class="ps-ck is-${i.level}" style="--i:${n}"><span class="ps-ck-ico" aria-hidden="true">${CK_ICON[i.level]}</span><span class="ps-ck-txt">${esc(i.text)}</span></li>`).join("");
+
+    el.chip.textContent =
+      worst === "ok" ? "All good" :
+      worst === "warn" ? "Almost there" :
+      "Needs a fix";
+
+    el.checks.innerHTML = items.map((i, n) =>
+      `<div role="listitem" class="ps-ck is-${i.level}" style="--i:${n}">
+        <span class="ps-ck-ico" aria-hidden="true">${CK_ICON[i.level]}</span>
+        <span class="ps-ck-txt">${esc(i.text)}</span>
+      </div>`
+    ).join("");
   }
 
   /* ------------------------------------------------------------ */

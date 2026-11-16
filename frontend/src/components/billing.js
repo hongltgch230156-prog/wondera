@@ -133,8 +133,8 @@ const PROVIDER_META = {
 };
 
 const TEST_HINTS = {
-  vnpay: `Test mode: choose bank <b>NCB</b> · card <b>9704198526191432198</b> · name <b>NGUYEN VAN A</b> · issued <b>07/15</b> · OTP <b>123456</b>. No real money is charged.`,
-  polar: `Test mode: card <b>4242 4242 4242 4242</b> · any future expiry · any CVC. No real money is charged.`,
+  vnpay: `<div style="text-align: center;"><b>1 credit = 1 3D generation (Single object, Multiple objects)</b>.<br />Credits never expire. If a generation fails, your credit is refunded automatically.</div>`,
+  polar: `<div style="text-align: center;"><b>1 credit = 1 3D generation (Single object, Multiple objects)</b>.<br />Credits never expire. If a generation fails, your credit is refunded automatically.</div>`,
 };
 
 let modal = null;
@@ -160,7 +160,7 @@ function ensureModal() {
       <p class="bill-hint"></p>
       <p class="bill-error" role="alert" hidden></p>
       <button class="bill-pay" type="button" disabled>Pay</button>
-      <p class="bill-foot">1 credit = 1 3D generation (Single object, Multiple objects scene, or one Magic Wand object). Credits never expire. If a generation fails, your credit is refunded automatically.</p>
+      <p class="bill-foot">All transactions are secure and encrypted. Fast & reliable checkout.</p>
     </section>`;
   document.body.appendChild(root);
 
