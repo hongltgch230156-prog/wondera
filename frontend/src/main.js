@@ -368,6 +368,11 @@ const showModal = (modal) => {
       if (isModalOpen) pauseSceneRender = true;
     }, 700);
   }
+
+  if (modal.classList.contains("about")) {
+    const frame = modal.querySelector(".magic-tree-frame");
+    if (frame) frame.src = frame.dataset.src;       // chỉ bắt đầu chạy Magic QR khi mở modal
+  }
 };
 
 
@@ -387,6 +392,10 @@ const hideModal = (modal) => {
       // Reset sau khi hiệu ứng đóng xong để khỏi thấy nội dung biến mất giữa chừng
       if (modal.classList.contains("hand-lab-modal")) closeHandLab();
       else if (modal.classList.contains("work")) forgeApi?.reset();
+      else if (modal.classList.contains("about")) {
+        const frame = modal.querySelector(".magic-tree-frame");
+        if (frame) frame.src = "about:blank";       // dừng hẳn Magic QR (bộ đếm giờ + gọi Giphy)
+      }
     },
   });
 };
