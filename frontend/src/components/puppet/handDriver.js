@@ -80,9 +80,10 @@ export class HandDriver {
   }
 
   async _loadLandmarker() {
-    // import() từ CDN: không cần cài thêm package. Nếu dự án đã có @mediapipe/tasks-vision, đổi dòng này thành: import("@mediapipe/tasks-vision")
     const vision = await import("@mediapipe/tasks-vision");
-    const fileset = await vision.FilesetResolver.forVisionTasks(new URL("../../../node_modules/@mediapipe/tasks-vision/wasm", import.meta.url).href);
+    const fileset = await vision.FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
     const make = (delegate) => vision.HandLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: TRACKING.MODEL_URL, delegate },
       runningMode: "VIDEO", numHands: 1,

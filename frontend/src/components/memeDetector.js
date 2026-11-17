@@ -16,7 +16,7 @@ const dbg = { ms: 0, n: 0, t: performance.now() };
 //   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm";
 
 const VISION_WASM_URL = new URL(
-  "../../node_modules/@mediapipe/tasks-vision/wasm",
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
   import.meta.url
 ).href;
 
