@@ -164,7 +164,7 @@ async function fetchBuffer(url, maxBytes) {
 const publicPath = (rel) => (rel ? `/files/${rel}` : '');
 
 const localStatic = express.static(STORAGE_DIR, { index: false, dotfiles: 'deny', maxAge: '7d' });
-const SAFE_REL = /^\/(models|exports|thumbs)\/[a-zA-Z0-9_\-]+\.(glb|jpg|png|webp)$/;
+const SAFE_REL = /^\/(models|exports|thumbs)\/[a-zA-Z0-9_\-]+\.(glb|jpg|jpeg|png|webp)$/;
 
 /** Dùng trong server.js:  app.use('/files', storage.filesMiddleware); */
 function filesMiddleware(req, res, next) {
