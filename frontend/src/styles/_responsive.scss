@@ -1,24 +1,24 @@
 @use "./variables.scss" as vars;
 
 /* =========================================================
-   1. GIỮ NGUYÊN VỊ TRÍ & KÍCH THƯỚC NÚT CANCEL [X], KHÔNG BỊ NUỐT MÉP
+   1. SỬA TRIỆT ĐỂ NÚT CANCEL [X] KHÔNG BỊ LẸM MÉP
    ========================================================= */
 .work.modal,
 .about.modal,
-.contact.modal {
-  overflow: visible;
+.contact.modal,
+.forge-modal,
+.magic-tree-modal {
+  overflow: visible !important;
 }
 
 .modal .modal-exit-button {
-  z-index: 30;
+  z-index: 50;
 }
 
-/* Chỉ cuộn nội dung bên trong từng khung modal, không cắt vào nút [X] */
-.forge-modal,
-.magic-tree-modal,
-.hand-lab-modal {
+/* Chỉ cuộn phần nội dung bên trong, không cuộn khung bọc nút [X] */
+.forge-body,
+.magic-tree-container {
   min-height: 0;
-  max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -26,7 +26,7 @@
 }
 
 /* =========================================================
-   2. MAGIC QR / MAGIC TREE: KÉO DÀI CARD VÀNG XUỐNG ĐÁY MODAL
+   2. MAGIC QR / MAGIC TREE: GIỮ CHIỀU CAO CARD VÀNG SÁT ĐÁY
    ========================================================= */
 .magic-tree-modal {
   display: flex;
@@ -59,13 +59,13 @@
   .contact.modal {
     max-height: calc(100dvh - 16px);
     padding: 10px 12px 14px;
-    overflow: visible;
+    overflow: visible !important;
   }
 
-  .forge-modal,
-  .magic-tree-modal,
   .hand-lab-modal {
     max-height: calc(100dvh - 40px);
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .forge-header {
@@ -81,7 +81,7 @@
 
   .forge-body,
   .forge-body.magic-wand-active {
-    min-height: 0;
+    max-height: calc(100dvh - 110px);
     gap: 14px;
   }
 
@@ -90,7 +90,6 @@
     min-height: 0;
   }
 
-  /* Giữ khung 3D vừa chiều cao màn hình ngang để không bị đẩy tràn đáy modal */
   .forge-viewer {
     flex: 0 0 auto;
     height: clamp(200px, calc(100dvh - 340px), 340px);
@@ -107,7 +106,6 @@
     height: 100%;
     overflow: hidden;
 
-    /* Cột bên trái (cam + 3 card chọn) tự cuộn mượt nếu chiều cao không đủ */
     .ps-sidebar,
     .ps-left,
     .ps-controls {
@@ -117,7 +115,6 @@
       padding-right: 4px;
     }
 
-    /* Thu gọn nhẹ 3 card chọn (nhân vật, đồ, bóng) để vừa mắt, đủ chọn */
     .ps-picker-card,
     .ps-option-card {
       padding: 8px 10px;
@@ -137,14 +134,13 @@
     max-height: calc(100dvh - 12px);
     padding: 10px;
     border-radius: 20px;
-    overflow: visible;
+    overflow: visible !important;
   }
 
-  /* 3D Forge: xếp 1 cột gọn, khung 3D không bị quá cao */
   .forge-body,
   .forge-body.magic-wand-active {
     grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
+    max-height: calc(100dvh - 110px);
     gap: 12px;
   }
 
@@ -158,14 +154,12 @@
     min-height: 180px;
   }
 
-  /* Magic QR */
   .magic-tree-container,
   .magic-tree-container > iframe,
   .magic-tree-container > div {
     min-height: max(420px, calc(100dvh - 130px));
   }
 
-  /* Hand Lab */
   .hand-lab-modal {
     height: auto;
     min-height: calc(100dvh - 36px);
