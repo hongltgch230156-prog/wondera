@@ -167,3 +167,59 @@
     overflow-y: auto;
   }
 }
+
+/* =========================================================
+   PUPPET STAGE (TABLET NGANG / MÀN HÌNH THẤP):
+   HIỆN TRỌN VẸN CARD INTERACTIVE BALL / ITEM
+   ========================================================= */
+@media (max-width: 1180px) and (max-height: 850px) {
+  #tab-puppet-stage {
+    height: 100%;
+    min-height: 0;
+
+    .ps-layout {
+      height: 100%;
+      min-height: 0;
+      align-items: stretch;
+    }
+
+    .ps-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 7px;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Webcam gọn hơn một chút để nhường chiều cao cho 3 card bên dưới */
+    .ps-cam {
+      flex: 0 1 auto;
+      min-height: 0;
+    }
+
+    .ps-cam-view {
+      height: auto;
+      aspect-ratio: 16 / 9;
+      max-height: 145px;
+    }
+
+    /* Các card chọn nhân vật / đồ / bóng gọn lại vừa tầm nhìn & chạm */
+    .ps-sel {
+      flex: 0 0 auto;
+      min-height: 0;
+      padding: 6px 8px;
+      gap: 4px;
+    }
+
+    .ps-sel-head {
+      font-size: 0.72rem;
+    }
+
+    .ps-tiles {
+      min-height: 54px;
+      max-height: 68px;
+    }
+  }
+}
