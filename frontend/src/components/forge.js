@@ -1085,14 +1085,18 @@ export function initForge() {
       magicObjectsGroup.name = "MagicWandObjects";
       activeScene.add(magicObjectsGroup);
       activeCamera.position.set(0, 0, 4);
+      const lowEnd = isMobileOrLowEnd();
+      const maxPixelRatio = lowEnd ? 1.25 : 2;
       activeRenderer = new THREE.WebGLRenderer({
         alpha: true,
-        antialias: true,
+        antialias: !lowEnd,
         preserveDrawingBuffer: true,
       });
       currentRenderer = activeRenderer;
       activeRenderer.setSize(forgeViewer.clientWidth, forgeViewer.clientHeight);
-      activeRenderer.setPixelRatio(window.devicePixelRatio);
+      activeRenderer.setPixelRatio(
+        Math.min(window.devicePixelRatio || 1, maxPixelRatio)
+      );
       activeRenderer.outputColorSpace = THREE.SRGBColorSpace;
       forgeViewer.appendChild(activeRenderer.domElement);
 
@@ -1204,6 +1208,9 @@ export function initForge() {
         activeCamera.aspect = forgeViewer.clientWidth / forgeViewer.clientHeight;
         activeCamera.updateProjectionMatrix();
         activeRenderer.setSize(forgeViewer.clientWidth, forgeViewer.clientHeight);
+        activeRenderer.setPixelRatio(
+          Math.min(window.devicePixelRatio || 1, maxPixelRatio)
+        );
       };
       window.addEventListener("resize", resizeHandler);
     }

@@ -1,0 +1,9 @@
+{
+  "appId": "com.hongle.wondera",
+  "appName": "Wondera",
+  "webDir": "dist",
+  "server": {
+    "url": "https://wonderaverse.duckdns.org",
+    "cleartext": true
+  }
+}

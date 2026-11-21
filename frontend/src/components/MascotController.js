@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import gsap from "gsap";
+import { getModelUrl, disposeObject3D } from "../utils/mobile3d.js";
 
 export class MascotController {
   // THÊM charId VÀO CONSTRUCTOR ĐỂ CHỌN NHÂN VẬT
@@ -68,6 +69,7 @@ async init() {
 
     try {
       await this.loadCharacter(charId, position);
+      disposeObject3D(previousMascot, this.scene);
       this.setIdle();
     } catch (error) {
       this.charId = previousId;
@@ -83,7 +85,7 @@ async init() {
   loadCharacter(charId, position) {
     return new Promise((resolve, reject) => {
       this.loader.load(
-        `/models/char${charId}.glb`,
+        getModelUrl(`char${charId}.glb`),
         (glb) => {
           this.charId = charId;
           

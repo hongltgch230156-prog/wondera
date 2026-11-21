@@ -14,6 +14,7 @@ import { ChatbotUI } from "./components/ChatbotUI.js";
 import { openHandLab, closeHandLab } from "./components/handlab.js";
 import { initAuth, API_BASE } from "./components/auth.js";
 import { createVoiceApi } from "./components/voice.js";
+import { isMobileOrLowEnd, getModelUrl, disposeObject3D } from "./utils/mobile3d.js";
 initAuth();
 
 /** -------------------------- Audio setup -------------------------- */
@@ -147,6 +148,14 @@ scene.add(ambientLight);
 // 2. Đèn định hướng (tạo độ khối và bóng râm, chiếu từ trên góc phải xuống)
 const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
 directionalLight.position.set(5, 10, 5);
+
+// Bật tính năng tạo bóng đổ cho đèn
+directionalLight.castShadow = true;
+
+// TỐI ƯU QUAN TRỌNG CHO MOBILE: Giảm kích thước map bóng xuống 512 hoặc 1024 (mặc định là 512)
+directionalLight.shadow.mapSize.width = 512;  
+directionalLight.shadow.mapSize.height = 512;
+
 scene.add(directionalLight);
 
 const camera = new THREE.PerspectiveCamera(
@@ -156,14 +165,20 @@ const camera = new THREE.PerspectiveCamera(
   200
 );
 
+// const renderer = new THREE.WebGLRenderer({
+//   canvas: canvas,
+//   antialias: true,
+// });
+const lowEnd = isMobileOrLowEnd();
+const maxPixelRatio = lowEnd ? 1.25 : 2;
+
 const renderer = new THREE.WebGLRenderer({
   canvas: canvas,
-  antialias: true,
+  antialias: !lowEnd,
+  powerPreference: "high-performance",
 });
-
 renderer.setSize(sizes.width, sizes.height);
-
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio));
 
 const controls = new OrbitControls(camera, renderer.domElement);
 
@@ -222,7 +237,7 @@ window.addEventListener("resize", () => {
 
   renderer.setSize(sizes.width, sizes.height);
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio));
 });
 
 /** -------------------------- Modal Stuff -------------------------- */
@@ -1186,7 +1201,7 @@ loader.setDRACOLoader(dracoLoader);
 
 // plant pot
 loader.load(
-  "/models/plant_pot.glb",
+  getModelUrl("plant_pot.glb"),
   (gltf) => {
     plantPotGroup = gltf.scene;
     // Đặt tên có chữ "Hover" để tự động nhận hiệu ứng nảy khi trỏ chuột
@@ -1211,7 +1226,7 @@ loader.load(
 
 // radio
 loader.load(
-  "/models/radio.glb",
+  getModelUrl("radio.glb"),
   (gltf) => {
     radioGroup = gltf.scene;
     radioGroup.name = "Hover_Radio";
@@ -1231,7 +1246,7 @@ loader.load(
 
 // Đặt đảo ở vị trí mascot
 loader.load(
-  "/models/island.glb",
+  getModelUrl("island.glb"),
   (gltf) => {
     const islandRoot = new THREE.Group();
     const islandModel = gltf.scene;
@@ -2549,6 +2564,10 @@ const updateClockHands = () => {
 const render = (timestamp) => {
 
   if (pauseSceneRender) { window.requestAnimationFrame(render); return; }
+  if (isModalOpen) {
+    window.requestAnimationFrame(render);
+    return;
+  }
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = Math.min(elapsedTime - previousTime, 0.1);
   previousTime = elapsedTime;

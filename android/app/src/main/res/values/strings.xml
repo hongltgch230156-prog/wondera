@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wondera</string>
+    <string name="title_activity_main">Wondera</string>
+    <string name="package_name">com.hongle.wondera</string>
+    <string name="custom_url_scheme">com.hongle.wondera</string>
+</resources>

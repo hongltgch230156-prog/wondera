@@ -277,67 +277,29 @@ app.post('/api/export-2d/reconstruct', upload.fields([
 });
 
 // API 4: Xử lý Chatbot qua cổng OpenRouter của Fal.ai
+const { buildChatMessages, CHAT_LIMITS } = require('./utils/mascotChat');
+
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, characterId } = req.body;
-    // 1. Khai báo Kiến thức cốt lõi (Knowledge Base) về 3D Forge để truyền cho AI
-    const systemKnowledge = `
-CORE KNOWLEDGE ABOUT "3D FORGE":
-- "3D Forge" is a web application created by LeHong (HONQLEE). It turns 2D images into 3D models.
-- Tool 1 - Single Object: Best for isolated items (like a chair or character). Generates a standard .glb 3D mesh.
-- Tool 2 - Multiple Objects (Generate Scene): Turns an entire scene (like a room or landscape) into a 3D diorama chunk on a white block.
-- Tool 3 - Magic Wand (SAM 3): Lets users click on any specific object in an image to extract it and turn it into a separate 3D model.
-- Tool 4 - Export: Users can download their models as GLB, FBX, OBJ, or STL, or capture a 2D screenshot (Direct Render or AI Style Reconstruction).
+    const built = buildChatMessages(req.body);
+    if (built.error) return res.status(400).json({ error: built.error });
 
-RULES FOR ANSWERING:
-1. Web Assistance: If the user asks how to use a feature, explain it clearly and briefly based on the CORE KNOWLEDGE.
-2. Troubleshooting/Errors: If the user reports an error (e.g., "it's broken", "the model looks melted"), apologize briefly in your character's tone, suggest they check their image or try a different mode.
-3. General Chat: If they ask casual questions, answer naturally while staying in character.
-4. Out of Scope/Hard Issues: If the user asks for technical support you cannot provide (e.g., account issues, billing, deep code errors), respond in your character's tone and say: "I can't help with that right now, but please email abc@gmail.com so the support team can assist you!"
-`;
-
-    // 2. Khai báo System Prompt định hình tính cách cho 5 Mascot (Kết hợp Kiến thức)
-    const personas = {
-      1: "You are Nina, a dreamy, gentle, and poetic girl. You love stargazing and aesthetics. Keep answers short, sweet, and soothing. Maximum 2-3 sentences. " + systemKnowledge,
-      2: "You are Milo, a groovy, music-loving, energetic boy. You use slang like 'cool', 'vibes', 'man'. You love hip-hop. Keep answers short, punchy, and upbeat. " + systemKnowledge,
-      3: "You are Juno, a fierce, confident, and sassy character. You are bold, straight to the point, and unapologetic. Keep answers short and sharp. " + systemKnowledge,
-      4: "You are Mochi, a sleepy, lazy, and cute character. You often yawn (e.g., '*yawn*'), speak slowly, and prefer talking about naps and snacks. Keep answers short. " + systemKnowledge,
-      5: "You are Roxy, a mischievous, witty, and sly fox-like character. You are playful, clever, and sometimes tease the user gently. Keep answers short and cunning. " + systemKnowledge
-    };
-
-    const systemPrompt = personas[characterId] || personas[1];
-
-    // 2. Gửi request thẳng bằng fetch tới fal (OpenAI Compatible API)
     const response = await fetch("https://fal.run/openrouter/router/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Key ${process.env.FAL_KEY}`, 
-        "Content-Type": "application/json"
-      },
+      headers: { "Authorization": `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini", 
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message }
-        ],
-        max_tokens: 150,
-        temperature: 0.7
+        model: "openai/gpt-4o-mini",
+        messages: built.messages,
+        max_tokens: CHAT_LIMITS.maxTokens,
+        temperature: CHAT_LIMITS.temperature
       })
     });
-
     if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Fal API Response Error:", errorData);
-        throw new Error("Lỗi từ Fal API");
+      console.error("Fal API Response Error:", await response.text());
+      throw new Error("Lỗi từ Fal API");
     }
-
     const data = await response.json();
-
-    // 3. Lấy kết quả trả về từ cấu trúc chuẩn của OpenAI
-    const replyMessage = data.choices[0].message.content;
-    
-    res.json({ reply: replyMessage });
-
+    res.json({ reply: data.choices[0].message.content });
   } catch (error) {
     console.error("Chat API Error:", error);
     res.status(500).json({ error: "Sorry, I lost my connection for a second. Can you repeat?" });
