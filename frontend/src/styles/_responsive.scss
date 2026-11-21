@@ -141,49 +141,54 @@
 }
 
 /* =========================================================
-   5. PUPPET STAGE (TABLET NGANG / MÀN HÌNH THẤP):
+5. PUPPET STAGE (TABLET NGANG / MÀN HÌNH THẤP):
       HIỆN TRỌN VẸN CARD INTERACTIVE BALL / ITEM
    ========================================================= */
 @media (max-width: 1280px) and (max-height: 900px) {
+  .contact.modal.hand-lab-modal {
+    padding-bottom: 10px !important;
+  }
+
   .contact.modal.hand-lab-modal #tab-puppet-stage {
-    height: 100% !important;
+    height: auto !important;
     min-height: 0 !important;
+    overflow: visible !important;
 
     .ps-layout {
-      height: 100% !important;
+      height: auto !important;
       min-height: 0 !important;
-      align-items: stretch !important;
+      align-items: flex-start !important;
       gap: 10px !important;
     }
 
     .ps-side {
       display: flex !important;
       flex-direction: column !important;
-      justify-content: space-between !important;
       gap: 6px !important;
-      height: 100% !important;
+      height: auto !important;
       min-height: 0 !important;
-      overflow-y: auto !important;
-      overscroll-behavior: contain;
+      overflow: visible !important;
     }
 
+    /* Webcam thu gọn thêm để nhường chỗ cho 3 card chọn */
     .ps-cam {
       flex: 0 0 auto !important;
       min-height: 0 !important;
     }
 
     .ps-cam-view {
-      height: 112px !important;
-      min-height: 100px !important;
-      max-height: 120px !important;
+      height: 96px !important;
+      min-height: 88px !important;
+      max-height: 100px !important;
       aspect-ratio: unset !important;
     }
 
     .ps-cam-foot {
-      padding-block: 3px !important;
-      font-size: 0.7rem !important;
+      padding-block: 2px !important;
+      font-size: 0.68rem !important;
     }
 
+    /* 3 card chọn (nhân vật, equipment, ball/item) gọn lại để không bị cắt đáy */
     .ps-sel {
       flex: 0 0 auto !important;
       min-height: 0 !important;
@@ -192,13 +197,26 @@
     }
 
     .ps-sel-head {
-      font-size: 0.7rem !important;
-      line-height: 1.1 !important;
+      font-size: 0.68rem !important;
+      line-height: 1.05 !important;
     }
 
     .ps-tiles {
-      min-height: 48px !important;
-      max-height: 56px !important;
+      min-height: 40px !important;
+      max-height: 46px !important;
+      height: 44px !important;
+    }
+
+    .ps-tile {
+      height: 100% !important;
+      min-height: 0 !important;
+      padding: 2px 4px !important;
+    }
+
+    .ps-tile img,
+    .ps-tile svg {
+      max-height: 24px !important;
+      width: auto !important;
     }
   }
 }
