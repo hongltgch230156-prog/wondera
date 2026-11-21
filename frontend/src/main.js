@@ -336,7 +336,7 @@ document.querySelectorAll(".modal-exit-button").forEach((button) => {
   );
 });
 
-let isModalOpen = true;
+let isModalOpen = false;
 let pauseSceneRender = false;
 
 const showModal = (modal) => {
