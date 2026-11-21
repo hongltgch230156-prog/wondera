@@ -21,25 +21,21 @@
   /* ---- Nút thoát: đưa VÀO TRONG khung, góc phải trên ---- */
   .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
   .modal.modal > .modal-exit-button.modal-exit-button {
-    top: 4px;
-    right: 4px;
-    left: auto;
+    top: 8px;
+    left: 8px;
+    right: auto;
     bottom: auto;
-    padding: 8px;
-    border-width: 5px;
-    border-radius: 1rem;
-    transform: none;
+    padding: 12px;
+    border-width: 6px;
+    border-radius: 1.1rem;
+    transform: rotate(-15deg);
     z-index: 20;
-    &:hover { transform: scale(1.1); }
+    &:hover { transform: rotate(45deg) scale(1.15); }
   }
-  .modal .exit-button-svg { width: 22px; height: 22px; }
+  .modal .exit-button-svg { width: 32px; height: 32px; }
 
-  /* ---- Tiêu đề không còn ép rộng 320px ---- */
-  .forge-header {
-    min-height: 52px;
-    margin-bottom: 12px;
-    padding-inline: 48px;
-  }
+  .forge-header { padding-inline: 84px; }
+
   .forge-close-square { width: 40px; height: 40px; font-size: 2rem; border-width: 3px; }
   .forge-title {
     min-width: 0;
@@ -94,17 +90,17 @@
   }
 
   /* Nút X vào trong khung để không bị cắt khi cuộn */
-  .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
-  .modal.modal > .modal-exit-button.modal-exit-button {
-    top: 6px;
-    left: 6px;
-    right: auto;
-    bottom: auto;
-    padding: 8px;
-    border-width: 5px;
-    z-index: 20;
-  }
-  .modal .exit-button-svg { width: 22px; height: 22px; }
+    .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
+    .modal.modal > .modal-exit-button.modal-exit-button {
+      top: 8px;
+      left: 8px;
+      right: auto;
+      bottom: auto;
+      padding: 12px;
+      border-width: 6px;
+      z-index: 20;
+    }
+  .modal .exit-button-svg { width: 32px; height: 32px; }
 
   .forge-header { min-height: 56px; margin-bottom: 10px; }
   .forge-title { padding: 8px 24px; }
@@ -119,5 +115,28 @@
     flex: 0 0 auto;
     height: clamp(220px, calc(100dvh - 430px), 345px);
     min-height: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
+  .modal.modal > .modal-exit-button.modal-exit-button {
+    padding: 8px;
+    border-width: 5px;
+  }
+  .modal .exit-button-svg { width: 24px; height: 24px; }
+  .forge-header { padding-inline: 64px; }
+}
+
+@media (max-width: 860px) {
+  #tab-puppet-stage .ps-main {
+    flex: 0 0 auto;
+    height: clamp(380px, 62dvh, 700px);
+    min-height: 0;
+  }
+  #tab-puppet-stage .ps-cam {
+    width: 100%;
+    max-width: 300px;
+    margin-inline: auto;
   }
 }
