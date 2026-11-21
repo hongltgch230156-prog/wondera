@@ -1,7 +1,57 @@
 @use "./variables.scss" as vars;
 
 /* =========================================================
-   1. KHUNG MODAL CHUNG & 3D FORGE (MÀN HÌNH THẤP / TABLET NGANG)
+   1. GIỮ NGUYÊN VỊ TRÍ & KÍCH THƯỚC NÚT CANCEL [X], KHÔNG BỊ NUỐT MÉP
+   ========================================================= */
+.work.modal,
+.about.modal,
+.contact.modal {
+  overflow: visible;
+}
+
+.modal .modal-exit-button {
+  z-index: 30;
+}
+
+/* Chỉ cuộn nội dung bên trong từng khung modal, không cắt vào nút [X] */
+.forge-modal,
+.magic-tree-modal,
+.hand-lab-modal {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =========================================================
+   2. MAGIC QR / MAGIC TREE: KÉO DÀI CARD VÀNG XUỐNG ĐÁY MODAL
+   ========================================================= */
+.magic-tree-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.magic-tree-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: calc(100dvh - 140px);
+  height: 100%;
+}
+
+.magic-tree-container > iframe,
+.magic-tree-container > div {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: calc(100dvh - 140px);
+  height: 100%;
+}
+
+/* =========================================================
+   3. KHUNG MODAL CHUNG & 3D FORGE (MÀN HÌNH THẤP / TABLET NGANG)
    ========================================================= */
 @media (max-height: 780px) {
   .work.modal,
@@ -9,10 +59,13 @@
   .contact.modal {
     max-height: calc(100dvh - 16px);
     padding: 10px 12px 14px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
+  }
+
+  .forge-modal,
+  .magic-tree-modal,
+  .hand-lab-modal {
+    max-height: calc(100dvh - 40px);
   }
 
   .forge-header {
@@ -46,7 +99,7 @@
 }
 
 /* =========================================================
-   2. TABLET NGANG / MÀN HÌNH VỪA: SỬA LỖI CẮT ĐÁY CARD CHỌN BÓNG
+   4. TABLET NGANG / MÀN HÌNH VỪA: SỬA LỖI CẮT ĐÁY CARD CHỌN BÓNG
    ========================================================= */
 @media (max-width: 1100px) and (orientation: landscape) {
   #tab-puppet-stage {
@@ -74,8 +127,7 @@
 }
 
 /* =========================================================
-   3. MÀN HÌNH HẸP / XOAY DỌC (<= 860px):
-      STAGE ~2/3 CHIỀU CAO, WEBCAM ~1/3, CARD CHỌN GỌN NHỎ
+   5. MÀN HÌNH HẸP (<= 860px)
    ========================================================= */
 @media (max-width: 860px) {
   .work.modal,
@@ -85,28 +137,7 @@
     max-height: calc(100dvh - 12px);
     padding: 10px;
     border-radius: 20px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Nút X nằm gọn trong khung */
-  .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
-  .modal.modal > .modal-exit-button.modal-exit-button {
-    top: 8px;
-    right: 8px;
-    left: auto;
-    bottom: auto;
-    padding: 8px;
-    border-width: 4px;
-    border-radius: 14px;
-    transform: none;
-    z-index: 25;
-  }
-  .modal .exit-button-svg {
-    width: 22px;
-    height: 22px;
+    overflow: visible;
   }
 
   /* 3D Forge: xếp 1 cột gọn, khung 3D không bị quá cao */
@@ -116,162 +147,29 @@
     min-height: 0;
     gap: 12px;
   }
+
   .forge-viewer {
     width: 100%;
     height: clamp(220px, 42dvh, 320px);
     min-height: 210px;
   }
+
   .multiple-mode-active .forge-upload-card.required {
     min-height: 180px;
   }
 
   /* Magic QR */
-  .magic-tree-container {
-    min-height: max(360px, calc(100dvh - 140px));
+  .magic-tree-container,
+  .magic-tree-container > iframe,
+  .magic-tree-container > div {
+    min-height: max(420px, calc(100dvh - 130px));
   }
 
-  /* Hand Lab & Puppet Stage trên màn hình dọc */
+  /* Hand Lab */
   .hand-lab-modal {
     height: auto;
-    min-height: calc(100dvh - 12px);
-    max-height: calc(100dvh - 12px);
+    min-height: calc(100dvh - 36px);
+    max-height: calc(100dvh - 36px);
     overflow-y: auto;
-  }
-
-  #tab-puppet-stage {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-
-    /* Stage chiếm phần chiều cao lớn (~2/3) */
-    .ps-main,
-    .ps-stage {
-      order: 1;
-      flex: 0 0 auto;
-      width: 100%;
-      height: clamp(250px, 38dvh, 380px);
-      min-height: 240px;
-    }
-
-    /* Webcam chiếm ~1/3 chiều cao stage, rõ mặt/tay, không bị dẹt thành 1 đường */
-    .ps-cam,
-    .ps-webcam,
-    .hl-camera-viewport {
-      order: 2;
-      flex: 0 0 auto;
-      width: 100%;
-      height: clamp(140px, 20dvh, 210px);
-      min-height: 135px;
-    }
-
-    /* Các card chọn nhân vật / đồ / bóng: gọn nhỏ vừa đủ nhìn & chạm */
-    .ps-picker-group,
-    .ps-pickers,
-    .ps-cards {
-      order: 3;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
-    }
-
-    .ps-picker-card,
-    .ps-option-card {
-      padding: 8px 10px;
-      border-radius: 14px;
-    }
-  }
-}
-
-/* 1. GIỮ NGUYÊN VỊ TRÍ & KÍCH THƯỚC NÚT [X], KHÔNG BỊ CẮT MÉP */
-.work.modal,
-.about.modal,
-.contact.modal {
-  /* Không cắt phần nút X ló ra ngoài khung modal */
-  overflow: visible;
-}
-
-.modal .modal-exit-button {
-  z-index: 30;
-}
-
-/* Cho phần nội dung bên trong modal tự cuộn thay vì cắt vào nút X */
-.forge-modal,
-.magic-tree-modal,
-.hand-lab-modal {
-  min-height: 0;
-  max-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* 2. MAGIC QR / MAGIC TREE: KÉO DÀI KHUNG NỘI DUNG XUỐNG ĐÁY MODAL (LINE VÀNG) */
-.magic-tree-container,
-.magic-tree-card,
-.magic-tree-stage {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: calc(100dvh - 150px);
-  height: 100%;
-}
-
-.magic-tree-container > iframe,
-.magic-tree-container > div {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-}
-
-/* 3. PUPPET STAGE KHI XOAY DỌC: ĐỎ (STAGE) CAO NHẤT, XANH (WEBCAM), VÀNG (OPTIONS/UPLOAD) */
-@media (max-width: 860px) and (orientation: portrait) {
-  #tab-puppet-stage {
-    display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    grid-template-areas:
-      "stage stage"
-      "cam   opts";
-    gap: 10px;
-    align-items: stretch;
-    min-height: calc(100dvh - 175px);
-  }
-
-  /* Line đỏ: Stage chiếm phần trên & chiều cao lớn hơn hẳn */
-  #tab-puppet-stage .ps-main,
-  #tab-puppet-stage .ps-stage {
-    grid-area: stage;
-    width: 100%;
-    min-height: 270px;
-    height: clamp(270px, 42dvh, 420px);
-  }
-
-  /* Line xanh biển: Webcam gọn bên trái dưới stage */
-  #tab-puppet-stage .ps-cam,
-  #tab-puppet-stage .ps-webcam,
-  #tab-puppet-stage .hl-camera-viewport {
-    grid-area: cam;
-    width: 100%;
-    min-height: 170px;
-    height: 100%;
-  }
-
-  /* Line vàng: Các card chọn đồ/con rối & upload gọn bên phải, dễ nhìn/chạm */
-  #tab-puppet-stage .ps-pickers,
-  #tab-puppet-stage .ps-controls,
-  #tab-puppet-stage .ps-sidebar {
-    grid-area: opts;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 6px;
-    min-width: 0;
-    min-height: 0;
-  }
-
-  #tab-puppet-stage .ps-picker-card,
-  #tab-puppet-stage .ps-option-card {
-    padding: 6px 8px;
-    border-radius: 12px;
   }
 }
