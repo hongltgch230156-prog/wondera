@@ -181,3 +181,97 @@
     }
   }
 }
+
+/* 1. GIỮ NGUYÊN VỊ TRÍ & KÍCH THƯỚC NÚT [X], KHÔNG BỊ CẮT MÉP */
+.work.modal,
+.about.modal,
+.contact.modal {
+  /* Không cắt phần nút X ló ra ngoài khung modal */
+  overflow: visible;
+}
+
+.modal .modal-exit-button {
+  z-index: 30;
+}
+
+/* Cho phần nội dung bên trong modal tự cuộn thay vì cắt vào nút X */
+.forge-modal,
+.magic-tree-modal,
+.hand-lab-modal {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 2. MAGIC QR / MAGIC TREE: KÉO DÀI KHUNG NỘI DUNG XUỐNG ĐÁY MODAL (LINE VÀNG) */
+.magic-tree-container,
+.magic-tree-card,
+.magic-tree-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: calc(100dvh - 150px);
+  height: 100%;
+}
+
+.magic-tree-container > iframe,
+.magic-tree-container > div {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+/* 3. PUPPET STAGE KHI XOAY DỌC: ĐỎ (STAGE) CAO NHẤT, XANH (WEBCAM), VÀNG (OPTIONS/UPLOAD) */
+@media (max-width: 860px) and (orientation: portrait) {
+  #tab-puppet-stage {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    grid-template-areas:
+      "stage stage"
+      "cam   opts";
+    gap: 10px;
+    align-items: stretch;
+    min-height: calc(100dvh - 175px);
+  }
+
+  /* Line đỏ: Stage chiếm phần trên & chiều cao lớn hơn hẳn */
+  #tab-puppet-stage .ps-main,
+  #tab-puppet-stage .ps-stage {
+    grid-area: stage;
+    width: 100%;
+    min-height: 270px;
+    height: clamp(270px, 42dvh, 420px);
+  }
+
+  /* Line xanh biển: Webcam gọn bên trái dưới stage */
+  #tab-puppet-stage .ps-cam,
+  #tab-puppet-stage .ps-webcam,
+  #tab-puppet-stage .hl-camera-viewport {
+    grid-area: cam;
+    width: 100%;
+    min-height: 170px;
+    height: 100%;
+  }
+
+  /* Line vàng: Các card chọn đồ/con rối & upload gọn bên phải, dễ nhìn/chạm */
+  #tab-puppet-stage .ps-pickers,
+  #tab-puppet-stage .ps-controls,
+  #tab-puppet-stage .ps-sidebar {
+    grid-area: opts;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  #tab-puppet-stage .ps-picker-card,
+  #tab-puppet-stage .ps-option-card {
+    padding: 6px 8px;
+    border-radius: 12px;
+  }
+}
