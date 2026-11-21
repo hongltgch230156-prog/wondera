@@ -2209,6 +2209,11 @@ function playHoverAnimation(objectHitbox, isHovering) {
   }
 }
 
+// Chạm vào các phần tử giao diện HTML (nút, ô nhập, khung chat, account...) KHÔNG được coi là chạm vào cảnh 3D
+const UI_TOUCH_SELECTOR =
+  "button, a, input, textarea, select, label, [role='button'], [contenteditable='true'], .chat-panel, .character-picker, .account-root, .account-button";
+const isUiTarget = (e) => e.target instanceof Element && e.target.closest(UI_TOUCH_SELECTOR) !== null;
+
 window.addEventListener("mousemove", (e) => {
   touchHappened = false;
 
@@ -2220,7 +2225,7 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener(
   "touchstart",
   (e) => {
-    if (isModalOpen) return;
+    if (isModalOpen || isUiTarget(e)) return;
 
     e.preventDefault();
 
@@ -2234,7 +2239,7 @@ window.addEventListener(
 window.addEventListener(
   "touchend",
   (e) => {
-    if (isModalOpen) return;
+    if (isModalOpen || isUiTarget(e)) return;
 
     e.preventDefault();
 
@@ -2245,7 +2250,10 @@ window.addEventListener(
   { passive: false }
 );
 
-window.addEventListener("click", handleRaycasterInteraction);
+window.addEventListener("click", (e) => {
+  if (isUiTarget(e)) return;      // bấm nút giao diện thì đừng kích hoạt vật thể 3D nằm phía sau
+  handleRaycasterInteraction();
+});
 
 const voiceApi = createVoiceApi({
   baseUrl: API_BASE,
