@@ -112,42 +112,59 @@ router.post('/login', limiter, async (req, res) => {
 router.post('/google', limiter, async (req, res) => {
   try {
     const accessToken = String(req.body.accessToken || '');
-    if (!accessToken) return res.status(400).json({ error: 'Missing Google token.' });
+    const idToken = String(req.body.idToken || '');
+    if (!accessToken && !idToken) return res.status(400).json({ error: 'Missing Google token.' });
     if (!process.env.GOOGLE_CLIENT_ID)
       return res.status(500).json({ error: 'Server chưa cấu hình GOOGLE_CLIENT_ID.' });
 
-    // 1) Token phải được cấp cho đúng Client ID của mình
-    const infoRes = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
-    );
-    if (!infoRes.ok) return res.status(401).json({ error: 'Invalid Google token.' });
-    const tokenInfo = await infoRes.json();
-    if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID)
-      return res.status(401).json({ error: 'Token Google does not belong to this application.' });
+    let profile;
+    if (idToken) {
+      // App Android: Google trả về ID token, nhờ Google kiểm tra chữ ký + hạn dùng
+      const infoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+      );
+      if (!infoRes.ok) return res.status(401).json({ error: 'Invalid Google token.' });
+      const info = await infoRes.json();
+      if (info.aud !== process.env.GOOGLE_CLIENT_ID)
+        return res.status(401).json({ error: 'Token Google does not belong to this application.' });
+      if (!['accounts.google.com', 'https://accounts.google.com'].includes(info.iss))
+        return res.status(401).json({ error: 'Invalid Google token.' });
+      profile = {
+        sub: info.sub,
+        email: info.email,
+        email_verified: info.email_verified === true || info.email_verified === 'true',
+        name: info.name,
+        picture: info.picture,
+      };
+    } else {
+      // Web: logic cũ dùng access_token
+      const infoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+      );
+      if (!infoRes.ok) return res.status(401).json({ error: 'Invalid Google token.' });
+      const tokenInfo = await infoRes.json();
+      if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID)
+        return res.status(401).json({ error: 'Token Google does not belong to this application.' });
+      const profRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!profRes.ok) return res.status(401).json({ error: 'Failed to fetch Google profile information.' });
+      profile = await profRes.json();
+    }
 
-    // 2) Lấy thông tin tài khoản
-    const profRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!profRes.ok) return res.status(401).json({ error: 'Failed to fetch Google profile information.' });
-    const profile = await profRes.json();
     if (!profile.email || !profile.email_verified)
       return res.status(401).json({ error: 'Google email is not verified.' });
-
     const email = profile.email.toLowerCase();
     let user = await User.findOne({ $or: [{ googleId: profile.sub }, { email }] });
-
     if (!user) {
       user = await User.create({ email, googleId: profile.sub, name: profile.name || email.split('@')[0], avatar: profile.picture || '' });
     } else {
-      // Liên kết Google vào tài khoản email đã có
       let dirty = false;
       if (!user.googleId) { user.googleId = profile.sub; dirty = true; }
       if (!user.avatar && profile.picture) { user.avatar = profile.picture; dirty = true; }
       if (!user.name && profile.name) { user.name = profile.name; dirty = true; }
       if (dirty) await user.save();
     }
-
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
     console.error('[auth/google]', err);

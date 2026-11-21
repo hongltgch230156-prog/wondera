@@ -29,6 +29,25 @@ export function logout() {
   window.location.reload();
 }
 
+const IS_NATIVE = !!window.Capacitor?.isNativePlatform?.();
+let socialLoginReady = false;
+
+async function nativeGoogleIdToken() {
+  const { SocialLogin } = await import("@capgo/capacitor-social-login");
+  if (!socialLoginReady) {
+    await SocialLogin.initialize({
+      google: { webClientId: GOOGLE_CLIENT_ID, mode: "online" },
+    });
+    socialLoginReady = true;
+  }
+  // không truyền scopes
+  const { result } = await SocialLogin.login({ provider: "google", options: {} });
+  if (result.responseType !== "online" || !result.idToken) {
+    throw new Error("Google login failed.");
+  }
+  return result.idToken;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tự gắn "Authorization: Bearer <token>" cho mọi request /api/...    */
 /*  => các file cũ (forge.js, handlab.js, ChatbotUI.js...) KHÔNG phải  */
@@ -606,6 +625,19 @@ function createAuthUI(onSuccess) {
     if (!GOOGLE_CLIENT_ID) {
       return showError("VITE_GOOGLE_CLIENT_ID is not configured in frontend/.env");
     }
+
+    // ===== Chạy trong app Android: dùng hộp chọn tài khoản native =====
+    if (IS_NATIVE) {
+      setBusy(true);
+      try {
+        const idToken = await nativeGoogleIdToken();
+        finish(await authRequest("/google", { idToken }));
+      } catch (err) {
+        showError(err?.message || "Google login failed.");
+        setBusy(false);
+      }
+      return;
+    }
     try {
       await loadGsi();
       if (!googleClient) {
@@ -649,7 +681,7 @@ function createAuthUI(onSuccess) {
     root,
     show() {
       root.classList.remove("is-checking");
-      if (GOOGLE_CLIENT_ID) loadGsi().catch(() => {}); // tải sẵn để popup không bị chặn
+      if (GOOGLE_CLIENT_ID && !IS_NATIVE) loadGsi().catch(() => {}); // tải sẵn để popup không bị chặn
     },
     dismiss() {
       root.classList.add("is-leaving");
