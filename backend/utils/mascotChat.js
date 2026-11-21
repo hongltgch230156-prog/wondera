@@ -9,7 +9,7 @@ const CHAT_LIMITS = {
   maxHistoryTurns: 8,      // số tin nhắn cũ được gửi kèm (để mascot hiểu câu hỏi tiếp nối)
   maxHistoryChars: 800,    // độ dài tối đa của mỗi tin nhắn cũ
   maxTokens: 700,          // đủ cho một hướng dẫn 5-6 bước
-  temperature: 0.6,
+  temperature: 0.4,
 };
 
 /* =====================================================================
@@ -166,12 +166,13 @@ function normalizeLanguage(language) {
 
 // Chỉ giữ ví dụ từ chối đúng ngôn ngữ đang chọn
 function personaForLanguage(persona, lang) {
+  const label =
+    'REFUSAL STYLE (use ONLY when the question is clearly unrelated to Wondera; NEVER use it for questions about Wondera features, in any language):';
+  const p = persona.replace(/OFF-TOPIC STYLE:/g, label);
   if (lang === 'vi') {
-    // bỏ ví dụ tiếng Anh, giữ ví dụ tiếng Việt
-    return persona.replace(/\s*Example \(English\):[\s\S]*?(?=Example \(Vietnamese\):)/, ' ');
+    return p.replace(/\s*Example \(English\):[\s\S]*?(?=Example \(Vietnamese\):)/, ' ');
   }
-  // bỏ ví dụ tiếng Việt, giữ ví dụ tiếng Anh
-  return persona.replace(/\s*Example \(Vietnamese\):[\s\S]*$/, '');
+  return p.replace(/\s*Example \(Vietnamese\):[\s\S]*$/, '');
 }
 
 function buildSystemPrompt(characterId, language) {
@@ -192,7 +193,8 @@ function buildChatMessages(body) {
   const raw = body && body.message;
   if (typeof raw !== 'string' || !raw.trim()) return { error: 'Message is required.' };
   const message = raw.trim().slice(0, CHAT_LIMITS.maxMessageChars);
-
+  const lang = normalizeLanguage(body.language);
+  const langName = lang === 'vi' ? 'Vietnamese' : 'English';
   const history = Array.isArray(body.history)
     ? body.history
         .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -200,11 +202,19 @@ function buildChatMessages(body) {
         .map((m) => ({ role: m.role, content: m.content.trim().slice(0, CHAT_LIMITS.maxHistoryChars) }))
     : [];
 
+  const finalReminder =
+    `REMINDER: Reply language is ${langName}. The user's next message may be written in a DIFFERENT language ` +
+    `(for example Vietnamese, Spanish or English). That is normal and does NOT make it off-topic. ` +
+    `Step 1: understand the message. Step 2: decide on-topic or off-topic ONLY by its meaning ` +
+    `(any question about using Wondera, its tools, account, credits or errors is on-topic, even if it does not say "Wondera"). ` +
+    `Step 3: write the answer in ${langName}.`;
+
   return {
     messages: [
-    { role: 'system', content: buildSystemPrompt(body.characterId, body.language) },
-    ...history,
-    { role: 'user', content: message },
+      { role: 'system', content: buildSystemPrompt(body.characterId, body.language) },
+      ...history,
+      { role: 'system', content: finalReminder },
+      { role: 'user', content: message },
     ],
   };
 }
