@@ -79,3 +79,45 @@
   .hl-camera-viewport { height: clamp(220px, 46dvh, 340px); }
   .hl-meme-viewport   { height: clamp(240px, 52dvh, 420px); }
 }
+
+/* Màn hình thấp (tablet ngang, laptop nhỏ): vẫn 2 cột nhưng khung cuộn bên trong */
+@media (max-height: 760px) {
+  .work.modal,
+  .about.modal,
+  .contact.modal {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Nút X vào trong khung để không bị cắt khi cuộn */
+  .modal.modal .forge-modal > .modal-exit-button.modal-exit-button,
+  .modal.modal > .modal-exit-button.modal-exit-button {
+    top: 6px;
+    left: 6px;
+    right: auto;
+    bottom: auto;
+    padding: 8px;
+    border-width: 5px;
+    z-index: 20;
+  }
+  .modal .exit-button-svg { width: 22px; height: 22px; }
+
+  .forge-header { min-height: 56px; margin-bottom: 10px; }
+  .forge-title { padding: 8px 24px; }
+
+  .forge-body,
+  .forge-body.magic-wand-active { min-height: 0; gap: 18px; }
+  .forge-source-panel,
+  .forge-output-panel { min-height: 0; }
+
+  /* Khung xem 3D co theo chiều cao màn hình, tối thiểu 220px */
+  .forge-viewer {
+    flex: 0 0 auto;
+    height: clamp(220px, calc(100dvh - 430px), 345px);
+    min-height: 0;
+  }
+}
