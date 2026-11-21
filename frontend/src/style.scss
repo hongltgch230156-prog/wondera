@@ -11,6 +11,7 @@
 @use "./styles/account.scss";
 @use "./styles/billing.scss";
 @use "./styles/puppet.scss"; 
+@use "./styles/responsive.scss";
 
 $themes: (
   light: (

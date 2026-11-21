@@ -3,6 +3,7 @@
 
 .overlay {
   height: 100vh;
+  height: 100dvh;  
   width: 100vw;
   overflow: hidden;
   position: fixed;
@@ -31,7 +32,7 @@
 }
 .work,.about, .contact {
   width: min(1180px, 85vw);
-  min-height: 760px;
+  min-height: min(760px, calc(100dvh - 40px));
   padding: 18px 18px 28px;
   background: rgba(241, 234, 245, 0.9);
   border-radius: 32px;
@@ -150,7 +151,7 @@
 /* Container bọc ngoài iframe */
 .magic-tree-container {
   width: 100%;
-  min-height: 620px; /* Bổ sung dòng này để ép khung to ra bằng với 3D Forge */
+  min-height: max(380px, min(620px, calc(100dvh - 220px)));
   display: flex; /* Dùng flexbox để ép iframe bên trong giãn hết cỡ */
   flex-direction: column;
   border-radius: 26px;

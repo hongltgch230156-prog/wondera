@@ -19,3 +19,10 @@ $base-white: #fdfdfd;
   justify-content: center;
   align-items: center;
 }
+
+// "Màn hình compact" = điện thoại, tablet dọc, HOẶC bất kỳ màn nào thấp (tablet ngang, điện thoại ngang)
+@mixin compact {
+  @media (max-width: 900px), (max-height: 620px) {
+    @content;
+  }
+}

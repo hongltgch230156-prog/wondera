@@ -345,7 +345,7 @@
 
 .character-card.active .check-icon { opacity: 1; transform: scale(1); }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
   .chat-panel { inset: 12px; width: auto; height: auto; bottom: 12px; }
   .character-picker {
     inset: 50% 12px auto;

@@ -8,8 +8,10 @@
   left: 50%;
   width: 108vw;
   height: 108vh;
+  height: 108dvh;
   margin-left: -54vw;
   margin-top: -54vh;
+  margin-top: -54dvh;
   overflow: hidden;
   z-index: 999999;
   border: 8px solid vars.$base-purple;
@@ -78,6 +80,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   z-index: 9999999;
   background-color: #000;
   display: flex;
@@ -94,5 +97,6 @@
 .duck-video {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   object-fit: cover;
 }
