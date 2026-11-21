@@ -280,6 +280,7 @@ app.post('/api/export-2d/reconstruct', upload.fields([
 const { buildChatMessages, CHAT_LIMITS } = require('./utils/mascotChat');
 
 app.post('/api/chat', async (req, res) => {
+  console.log('[chat] language =', req.body.language);
   try {
     const built = buildChatMessages(req.body);
     if (built.error) return res.status(400).json({ error: built.error });
