@@ -1690,3 +1690,15 @@
   .hl-meme-card.is-skeleton { animation: none; }
 }
 
+/* Puppet Stage: cho cuộn dọc nhưng ẩn thanh cuộn */
+#tab-puppet-stage.is-active {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;     /* cuộn hết thì không kéo trang phía sau */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;            /* Firefox */
+  -ms-overflow-style: none;         /* Edge/IE cũ */
+}
+#tab-puppet-stage.is-active::-webkit-scrollbar {
+  display: none;                    /* Chrome, Safari, Edge mới */
+}
