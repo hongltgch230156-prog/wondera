@@ -2259,9 +2259,13 @@ const voiceApi = createVoiceApi({
   baseUrl: API_BASE,
 });
 
+const useServerVoice =
+  window.Capacitor?.isNativePlatform?.() || /Android/i.test(navigator.userAgent);
+
 const chatbotUI = new ChatbotUI({
   characters,
   initialCharacterId: initialCharacter.id,
+  voiceEngine: useServerVoice ? "server" : "auto",
   onClose: () => {
     chatbotMascot.closeChat();
     controls.enabled = !isModalOpen;
