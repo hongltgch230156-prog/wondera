@@ -227,8 +227,8 @@ html.is-phone {
 
       column-gap: 10px;
 
-      height: calc(100dvh - 90px);
-      max-height: calc(100dvh - 90px);
+      height: calc(100dvh - 7px);
+      max-height: calc(100dvh - 7px);
       min-height: 0;
 
       box-sizing: border-box;
@@ -252,29 +252,30 @@ html.is-phone {
   .puzzle-layout .puzzle-cam-box { flex: 1 1 0; min-height: 0; padding: 6px; gap: 0; border-radius: 12px; }
   .puzzle-layout .puzzle-cam-view { flex: 1 1 0; min-height: 80px; aspect-ratio: auto; border-width: 2px; border-radius: 10px; }
   .puzzle-layout .cam-hint { display: none; }
-  .puzzle-progress-wrap { width: auto; padding: 4px 10px; }
+  .puzzle-progress-wrap { flex: 0 0 auto; width: auto; padding: 4px 10px; }
   .puzzle-progress-wrap .puzzle-progress-text { font-size: 0.78rem; }
   .puzzle-progress-wrap .puzzle-progress-bar { height: 8px; }
-  .puzzle-layout .puzzle-level-select { padding: 6px 8px; }
+  .puzzle-layout .puzzle-level-select { flex: 0 0 auto; padding: 6px 8px; }
   .puzzle-layout .level-header { margin-bottom: 4px; font-size: 0.62rem; }
   .puzzle-layout .level-dots .level-dot { width: 26px; height: 26px; font-size: 0.75rem; }
   .puzzle-layout .level-dots .level-arrow { width: 22px; height: 22px; }
-  .puzzle-actions { gap: 6px; margin-top: 0; }
+  .puzzle-actions { flex: 0 0 auto; gap: 6px; margin-top: 0; }
   .puzzle-actions .hl-action-btn { padding: 6px 10px; font-size: 0.75rem; }
 
   /* Khu vực chứa bàn ghép */
   .puzzle-board-container {
+      flex: 1 1 auto;
       min-height: 0;
       min-width: 0;
 
-      height: 100%;
-      padding: 8px 12px;
+      margin-top: 12px;
+      padding: 18px 24px;
 
       display: flex;
       align-items: center;
       justify-content: center;
 
-      overflow: hidden;
+      overflow: visible;
       box-sizing: border-box;
   }
 
