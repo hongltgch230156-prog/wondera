@@ -11,6 +11,7 @@
 //  - Khi mờ dần / nháy trắng, cả con rối được vẽ vào một lớp riêng rồi mới trộn.
 import { STAGE, LAYOUT, PHYSICS } from "./puppetConfig.js";
 import { applyXf, pivotXf, restShoulderPivot } from "./poseSolver.js";
+import { IS_PHONE } from "../device.js";
 
 /** Các núm chỉnh. Muốn đổi cảm giác con rối chỉ cần sửa ở đây. */
 export const PUPPET_FIT = {
@@ -427,7 +428,7 @@ export class StageRenderer {
   }
   resize() {
     const r = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = IS_PHONE ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     // "cover": phủ kín khung, cắt phần thừa

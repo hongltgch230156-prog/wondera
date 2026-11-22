@@ -332,6 +332,7 @@ const V0 = { thumb: { x: -1.1, y: -0.7 }, index: { x: -0.5, y: -2.3 }, middle: {
 function frame(now) {
   if (!S.running) return;
   S.raf = requestAnimationFrame(frame);
+  if (IS_PHONE && now - S.last < 30) return;   // điện thoại: tối đa ~30 khung/giây, đỡ nóng và đỡ giật
   const tF = performance.now();
   const dt = Math.min(0.05, (now - S.last) / 1000); S.last = now; S.t += dt;
   if (!S.ready || !S.userSprite || !S.aiSprite) return;
