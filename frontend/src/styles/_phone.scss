@@ -256,21 +256,53 @@ html.is-phone {
   .puzzle-actions { gap: 6px; margin-top: 0; }
   .puzzle-actions .hl-action-btn { padding: 6px 10px; font-size: 0.75rem; }
 
-  /* Bàn xếp hình: rút gọn chiều cao để hiện đủ 12 mảnh, chừa lề cho tai ghép */
+  /* Bàn xếp hình: co gọn theo chiều cao khung để hiện trọn vẹn 12 mảnh */
   .puzzle-board-container {
-  min-height: 0;
-  padding: 6px 14px 10px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    min-height: 0;
+    padding: 10px 16px 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .puzzle-board {
-  width: auto;
-  max-width: 100%;
-  height: 100%;
-  max-height: 100%;
-  aspect-ratio: 4 / 3;
-  margin-top: 0;
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    aspect-ratio: auto;
+    margin-top: 0;
+  }
+
+  /* Khi màn hình ngang thấp (như điện thoại ngang / 780x360) */
+  @media (max-height: 460px) {
+    #tab-snap-solve:has(#hl-level-view[style*="flex"]) {
+      height: calc(100dvh - 56px);
+      max-height: calc(100dvh - 56px);
+      grid-template-columns: 165px minmax(0, 1fr);
+    }
+
+    .puzzle-layout .puzzle-cam-view {
+      min-height: 54px;
+    }
+
+    .puzzle-layout .puzzle-level-select {
+      padding: 4px 6px;
+    }
+
+    .puzzle-layout .level-dots .level-dot {
+      width: 22px;
+      height: 22px;
+      font-size: 0.7rem;
+    }
+
+    .puzzle-actions .hl-action-btn {
+      padding: 4px 8px;
+      font-size: 0.7rem;
+    }
+
+    .puzzle-board-container {
+      padding: 8px 14px 12px;
+    }
   }
