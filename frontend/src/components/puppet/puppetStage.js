@@ -7,6 +7,8 @@ import { packageFromImage, listSaved, savePackage, removeSaved, restorePackage }
 import { createUploader } from "./puppetUploader.js";
 import { cleanImage } from "./rigEngine.js";
 import { HandDriver } from "./handDriver.js";
+import { IS_PHONE } from "../device.js";
+import { TouchDriver, mountPhoneUI } from "./touchDriver.js";
 import { RallyEngine, GUARDS } from "./rallyEngine.js";
 import { solvePose, equipmentFrame } from "./poseSolver.js";
 import { StageRenderer, PuppetSprite } from "./puppetRenderer.js";
@@ -21,6 +23,22 @@ const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const LOCKED = new Set(["climax", "finisher", "strike"]);   // đòn đặc biệt: giữ nguyên chỗ đứng (tay vung không được làm con rối trượt / đổi độ sâu)
 const HOME = new Set(["idle", "countdown", "result"]);      // trước trận, lúc đếm 3-2-1 và sau trận: đứng đúng vị trí khởi tạo
 const ACTIVE = new Set(["countdown", "serve", "rally", "point", "climax", "finisher", "strike"]);
+// Chữ hướng dẫn: điện thoại (nút ảo) khác tablet / laptop (bàn tay trước camera).
+const TXT = IS_PHONE
+  ? {
+      intro: "Use the left stick to move and the right pad to swing your racket.",
+      play: "Left stick = move  ·  right pad = racket",
+      rule3: "Then tap <b>HIGH</b>, <b>MID</b> or <b>LOW</b> to <b>throw your weapon</b>. Hit where the AI’s shield is <b>not</b> to win!",
+      throwNow: "THROW NOW!",
+      finisher: "Tap HIGH, MID or LOW to throw your weapon – hit where the shield is NOT.",
+    }
+  : {
+      intro: "Show your hand to the camera – your fingers pull the puppet’s strings.",
+      play: null,
+      rule3: `Then flick or sweep your <b>${WEAPON_FINGER}</b> finger <b>left → right</b> to <b>throw your weapon</b>. Hit where the AI’s shield is <b>not</b> to win!`,
+      throwNow: "SWING NOW!  →",
+      finisher: `Flick or sweep your ${WEAPON_FINGER.toUpperCase()} finger LEFT → RIGHT to THROW your weapon. Aim up / across / down – hit where the shield is NOT.`,
+    };
 const ICON_UP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>';
 const HEART = (on) => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" fill="${on ? "#e5598b" : "none"}" stroke="${on ? "#a8305f" : "#b9a6d6"}" stroke-width="2" stroke-linejoin="round"/></svg>`;
 const S = {
@@ -30,7 +48,7 @@ const S = {
   userId: null, userSprite: null, aiSprite: null,
   equip: { armR: "pingpong", armL: "sword" }, equipHand: "armL", equipImgs: new Map(), shieldImg: null,
   ballId: "pearl", ballImg: null, customBalls: [],
-  raf: 0, last: 0, t: 0,
+  raf: 0, last: 0, t: 0, phone: null,
   // Vị trí con rối người chơi TRÊN MẶT SÀN: X = trái/phải, Y = độ sâu (y của đế giày; nhỏ = lùi vào trong). Độ cao khi bay là tham số RIÊNG (engine.user.jump).
   userX: L.USER_START_X, userY: L.STAND_Y, knockX: 0, knockTarget: 0, tgtF: {}, prevJ: null,
   rkPrev: null, rkVel: { x: 0, y: 0 },
@@ -62,22 +80,27 @@ export function initPuppetStage() {
     rules.innerHTML = [
       "Hit the ball back with your <b>racket</b> – every good return charges <b>POWER</b>.",
       "When POWER is full (or you reach <b>match point</b>) your puppet leaps and the ball freezes in the air.",
-      `Then flick or sweep your <b>${WEAPON_FINGER}</b> finger <b>left → right</b> to <b>throw your weapon</b>. Hit where the AI’s shield is <b>not</b> to win!`,
+      TXT.rule3,
     ].map((t) => `<li>${t}</li>`).join("");
     S.dom.ovText.after(rules);
     S.renderer = new StageRenderer(S.dom.canvas);
     S.engine = new RallyEngine(onEvent);
-    S.driver = new HandDriver({ video: S.dom.video, overlay: S.dom.camOverlay, onStatus: setStatus, external: true });
+    //S.driver = new HandDriver({ video: S.dom.video, overlay: S.dom.camOverlay, onStatus: setStatus, external: true });
+    //S.driver.simArea = S.dom.stage;
+    S.driver = IS_PHONE
+      ? new TouchDriver({ onStatus: setStatus })
+      : new HandDriver({ video: S.dom.video, overlay: S.dom.camOverlay, onStatus: setStatus, external: true });
     S.driver.simArea = S.dom.stage;
     S.uploader = createUploader(S.dom.stage, { onUse: (pkg) => addCustomPuppet(pkg) });
     bindUi(root);
+    if (IS_PHONE) S.phone = mountPhoneUI({ dom: S.dom, driver: S.driver });
     // con rối + tài nguyên
     for (const p of PRESET_PUPPETS) registerPreset(p);
     for (const e of listSaved()) S.registry.set(e.id, { id: e.id, name: e.name, thumb: e.png, saved: true, load: async () => restorePackage(e) });
     renderPuppetTiles(); renderEquipTiles(); renderBallTiles();
     await Promise.all([S.renderer.loadBackground(), selectPuppet(PRESET_PUPPETS[0].id), loadAi(), loadShield(), selectBall("pearl", true), preloadEquip()]);
     S.ready = true;
-    showOverlay("PUPPET STAGE", "Show your hand to the camera – your fingers pull the puppet’s strings.", "START");
+    showOverlay("PUPPET STAGE", TXT.intro, "START");
   })();
   return S.initPromise;
 }
@@ -219,19 +242,22 @@ export function stopPuppetStage() {
   if (!S.initPromise) return;
   S.running = false; cancelAnimationFrame(S.raf);
   S.driver?.stop();
+  S.phone?.reset();
   S.engine?.reset(); S.fx.clear(); resetPositions();
   S.uploader?.close();
-  if (S.dom) { setLive("off", "OFF"); showOverlay("PUPPET STAGE", "Show your hand to the camera – your fingers pull the puppet’s strings.", "START"); S.dom.hud.hidden = true; }
+  if (S.dom) { setLive("off", "OFF"); showOverlay("PUPPET STAGE", TXT.intro, "START"); S.dom.hud.hidden = true; }
 }
 function startGame() {
   if (!S.ready) return;
   S.fx.clear(); resetPositions(); S.engine.start();
   S.dom.overlay.hidden = true; S.dom.hud.hidden = false; S.dom.guard.hidden = true;
-  S.dom.tip.textContent = S.driver.mode === "sim" ? "Mouse mode: move the mouse, Space = swing, keys 1-5 fold a finger" : "Move your hand – each finger pulls one of the puppet’s limbs";
+  S.dom.tip.textContent = IS_PHONE ? TXT.play : (S.driver.mode === "sim" ? "Mouse mode: move the mouse, Space = swing, keys 1-5 fold a finger" : "Move your hand – each finger pulls one of the puppet’s limbs");
+  S.phone?.closeDrawer();
   updateHud(true);
 }
 /** Đưa MỌI trạng thái di chuyển về điểm xuất phát: vị trí, độ sâu, lực giật lùi, bộ lọc tay, bộ nhớ khuỷu, vận tốc vợt (độ cao / vũ khí / hoạt ảnh tấn công do engine.reset() lo) */
 function resetPositions() {
+  S.driver?.resetPos?.();
   S.userX = L.USER_START_X; S.userY = L.STAND_Y; S.knockX = 0; S.knockTarget = 0;
   S.tgtF = {}; S.prevJ = null; S.rkPrev = null; S.rkVel = { x: 0, y: 0 };
 }
@@ -260,7 +286,7 @@ function onEvent(type, d) {
     case "bounce": fx.bounce(d.x, d.y); break;
     case "point": say(d.who === "user" ? "POINT!" : "MISS!", 1.2); S.dom.tip.textContent = d.reason; updateHud(true); break;
     case "climax": say(d.reason === "match" ? "MATCH POINT!" : "POWER FULL!", 1.4); break;
-    case "finisherStart": say("SWING NOW!  →", 99); S.dom.guard.hidden = false; S.dom.tip.textContent = `Flick or sweep your ${WEAPON_FINGER.toUpperCase()} finger LEFT → RIGHT to THROW your weapon. Aim up / across / down – hit where the shield is NOT.`; S.dom.swing.hidden = false; paintGuard(S.engine.ai.guard); break;
+    case "finisherStart": say(TXT.throwNow, 99); S.dom.guard.hidden = false; S.dom.tip.textContent = TXT.finisher; S.dom.swing.hidden = false; paintGuard(S.engine.ai.guard); break;
     case "guard": paintGuard(d.guard); break;
     case "strike": say("THROW!", 0.7); S.dom.swing.hidden = true; break;
     case "release": fx.hit(d.x, d.y, 0.5, "#ffe9a8"); break;                                   // vũ khí rời tay
@@ -310,6 +336,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - S.last) / 1000); S.last = now; S.t += dt;
   if (!S.ready || !S.userSprite || !S.aiSprite) return;
   const h = S.driver, eng = S.engine;
+  if (h.touch) { h.setPhase(HOME.has(eng.phase), LOCKED.has(eng.phase)); S.phone?.sync(eng.phase, eng.ai.guard); }
   h.tick();
   // --- tạm dừng khi mất bàn tay giữa trận ---
   const lost = ACTIVE.has(eng.phase) && !h.present && h.lostForMs > TRACKING.LOST_MS && S.driver.mode === "camera";

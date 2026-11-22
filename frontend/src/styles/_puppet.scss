@@ -550,3 +550,82 @@
   .ps-spin { animation-duration: 2.4s; }
 }
 @media (max-width: 560px) { .ps-report-list { grid-template-columns: 1fr; } }
+
+
+/* ===== PUPPET STAGE – CHẾ ĐỘ ĐIỆN THOẠI (chỉ có hiệu lực khi JS thêm .ps-phone) ===== */
+#tab-puppet-stage.ps-phone {
+  --tc-fill: rgba(233, 220, 245, 0.6);
+  --tc-solid: #e9dcf5;
+  --tc-line: #6f5aa6;
+  --tc-ink: #5a46a0;
+  --tc-shadow: 0 3px 0 rgba(90, 70, 160, 0.35), 0 8px 16px rgba(60, 40, 120, 0.22);
+  --tc-pad: clamp(84px, 30vh, 120px);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+
+/* 1) Sân khấu phủ kín tab; ẩn webcam và thanh lực vung */
+#tab-puppet-stage.ps-phone #ps-stage {
+  position: absolute !important; inset: 0 !important;
+  width: auto !important; height: auto !important; max-width: none !important; max-height: none !important;
+  margin: 0 !important; aspect-ratio: auto !important; border-radius: 0 !important; z-index: 1;
+}
+#tab-puppet-stage.ps-phone #ps-canvas { width: 100%; height: 100%; display: block; }
+#tab-puppet-stage.ps-phone .ps-phone-hide,
+#tab-puppet-stage.ps-phone .ps-swing { display: none !important; }
+#tab-puppet-stage.ps-phone #ps-tip {
+  position: absolute; top: 44px; bottom: auto; left: 50%; transform: translateX(-50%);
+  max-width: 58%; text-align: center; font-size: 12px; line-height: 1.3; pointer-events: none;
+}
+
+/* 2) Ngăn kéo chọn con rối / trang bị / bóng */
+#tab-puppet-stage.ps-phone .ps-drawer {
+  position: absolute !important; top: 0; bottom: 0; left: 0; right: auto;
+  width: min(380px, 84%) !important; max-width: none !important; height: auto !important;
+  display: flex !important; flex-direction: column; gap: 10px;
+  padding: 10px 12px 14px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  background: rgba(238, 228, 250, 0.97); border-right: 3px solid var(--tc-line); border-radius: 0 18px 18px 0;
+  box-shadow: 6px 0 24px rgba(60, 40, 120, 0.3);
+  transform: translateX(-105%); visibility: hidden; z-index: 6;
+  transition: transform 0.26s ease, visibility 0s 0.26s;
+}
+#tab-puppet-stage.ps-phone.is-drawer-open .ps-drawer { transform: none; visibility: visible; transition: transform 0.26s ease, visibility 0s; }
+.ps-drawer-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 13px; letter-spacing: 0.06em; color: var(--tc-ink); }
+.ps-drawer-x { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 12px; border: 3px solid var(--tc-line); background: var(--tc-solid); color: var(--tc-ink); cursor: pointer; }
+.ps-drawer-backdrop { position: absolute; inset: 0; z-index: 5; background: rgba(40, 24, 70, 0.35); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+#tab-puppet-stage.ps-phone.is-drawer-open .ps-drawer-backdrop { opacity: 1; pointer-events: auto; }
+
+/* 3) Nút mở ngăn kéo (đổi --tc-menu-top / --tc-menu-left nếu trùng với HUD) */
+.ps-tc-menu {
+  position: absolute; top: var(--tc-menu-top, 10px); left: var(--tc-menu-left, 10px); z-index: 7;
+  width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
+  border-radius: 14px; border: 3px solid var(--tc-line); background: var(--tc-solid); color: var(--tc-ink); box-shadow: var(--tc-shadow);
+}
+.ps-phone.is-drawer-open .ps-tc-menu { display: none; }
+
+/* 4) Cần trượt + vùng vợt + 3 nút ném */
+.ps-tc-pads { display: contents; }
+.ps-tc-stick {
+  position: absolute; bottom: 14px; z-index: 3; width: var(--tc-pad); height: var(--tc-pad); border-radius: 50%;
+  background: var(--tc-fill); border: 3px solid var(--tc-line); box-shadow: var(--tc-shadow);
+  touch-action: none; -webkit-tap-highlight-color: transparent; transition: opacity 0.2s, background 0.15s;
+}
+.ps-tc-stick::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; }   /* vùng chạm rộng hơn hình vẽ */
+.ps-tc-stick--move { left: 14px; }
+.ps-tc-stick--aim { right: 14px; }
+.ps-tc-stick.is-on { background: rgba(233, 220, 245, 0.88); }
+.ps-tc-knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: var(--tc-solid); border: 3px solid var(--tc-line); box-shadow: 0 2px 0 rgba(90, 70, 160, 0.35); pointer-events: none; }
+.ps-tc-cap { position: absolute; left: 0; right: 0; top: -17px; text-align: center; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--tc-ink); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8); pointer-events: none; }
+.ps-tc-throw { position: absolute; right: 14px; bottom: 14px; z-index: 3; display: none; flex-direction: column; gap: 8px; }
+.ps-tc-throw button {
+  width: 104px; height: 46px; padding: 0; font: inherit; font-weight: 800; letter-spacing: 0.08em;
+  border-radius: 14px; border: 3px solid var(--tc-line); background: var(--tc-solid); color: var(--tc-ink); box-shadow: var(--tc-shadow); touch-action: none;
+}
+.ps-tc-throw button:active { transform: translateY(2px); }
+.ps-tc-throw button.is-guarded { opacity: 0.45; border-style: dashed; }   /* khiên AI đang ở tầng này */
+.ps-tc.is-finisher .ps-tc-stick--aim { display: none; }
+.ps-tc.is-finisher .ps-tc-stick--move { opacity: 0.3; pointer-events: none; }
+.ps-tc.is-finisher .ps-tc-throw { display: flex; }
+
+/* 5) Ẩn nút khi màn chờ / khung upload đang hiện (nút mở ngăn kéo vẫn hiện ở màn chờ để chọn con rối trước khi START) */
+#tab-puppet-stage.ps-phone:has(#ps-overlay:not([hidden])) .ps-tc-pads { visibility: hidden; }
+#tab-puppet-stage.ps-phone:has(.ps-up:not([hidden])) .ps-tc { visibility: hidden; }

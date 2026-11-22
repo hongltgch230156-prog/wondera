@@ -10,6 +10,11 @@ import {
   DrawingUtils
 } from "@mediapipe/tasks-vision";
 
+import { IS_PHONE } from "./device.js";
+
+const PALM_HOLD_MS = 800;   // giữ bàn tay mở ~0.8 giây thì bắt đầu chụp
+let openPalmSince = 0;
+
 const dbg = { ms: 0, n: 0, t: performance.now() };
 
 // const VISION_WASM_URL =
@@ -62,7 +67,7 @@ export function setOnHandTracking(callback) {
     // Đang chơi ghép hình chỉ cần 1 tay (nhanh hơn, và không bị nhảy qua lại giữa 2 tay).
     // Hết game -> trả về 2 tay cho động tác "khung ảnh".
     try {
-        gestureRecognizer?.setOptions({ numHands: callback ? 1 : 2 });
+        gestureRecognizer?.setOptions({ numHands: (callback || IS_PHONE) ? 1 : 2 });
     } catch (e) {
         console.warn("[Hand Lab] setOptions failed:", e);
     }
@@ -85,7 +90,7 @@ async function initializeMediaPipe(needFace = true) {
       GestureRecognizer.createFromOptions(vision, {
         baseOptions: { modelAssetPath: GESTURE_MODEL_URL, delegate },
         runningMode: "VIDEO",
-        numHands: 2,
+        numHands: IS_PHONE ? 1 : 2,
         minHandDetectionConfidence: 0.5,
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5,
@@ -268,7 +273,7 @@ function detectGesture(timestamp) {
   isFraming = false;
 
   // Nếu MediaPipe phát hiện được từ 2 bàn tay trở lên
-  if (result.landmarks && result.landmarks.length >= 2) {
+  if (!IS_PHONE && result.landmarks && result.landmarks.length >= 2) {
     const hand1 = result.landmarks[0];
     const hand2 = result.landmarks[1];
 
@@ -467,24 +472,38 @@ function processFrame() {
     updateMemeUI();
 
     // KIỂM TRA TỰ ĐỘNG CHỤP: Kích hoạt khi user giơ khung ảnh (isFraming)
-    if (isFraming && !autoScanTriggered) {
-      if (framingSince === 0) framingSince = timestamp;
-      
-      // Nếu giữ nguyên khung ảnh đủ 0.8 giây -> Chụp!
-      if (timestamp - framingSince >= FRAMING_STABLE_DURATION) {
-        autoScanTriggered = true;
-        if (typeof onGestureStableCallback === 'function') {
-          onGestureStableCallback();
+    if (IS_PHONE) {
+      // Điện thoại: giữ 1 bàn tay mở để chụp
+      const palmOpen = currentGesture === "open_palm" && currentGestureScore >= 0.6;
+      if (palmOpen && !autoScanTriggered) {
+        if (openPalmSince === 0) openPalmSince = timestamp;
+        if (timestamp - openPalmSince >= PALM_HOLD_MS) {
+          autoScanTriggered = true;
+          if (typeof onGestureStableCallback === "function") onGestureStableCallback();
         }
+      } else if (!palmOpen) {
+        openPalmSince = 0;
       }
-    } else if (!isFraming) {
-      framingSince = 0; // Hủy đếm nếu user bỏ tay xuống
+    } else {
+      // ===== Tablet / laptop: GIỮ NGUYÊN code cũ (khung ảnh 2 tay) =====
+      if (isFraming && !autoScanTriggered) {
+        if (framingSince === 0) framingSince = timestamp;
+        if (timestamp - framingSince >= FRAMING_STABLE_DURATION) {
+          autoScanTriggered = true;
+          if (typeof onGestureStableCallback === 'function') {
+            onGestureStableCallback();
+          }
+        }
+      } else if (!isFraming) {
+        framingSince = 0;
+      }
     }
   }
   animationFrameId = requestAnimationFrame(processFrame);
 }
 
 export function resetAutoScan() {
+    openPalmSince = 0;
     autoScanTriggered = false;
     lastStableGesture = "None";
     stableGestureSince = performance.now();
@@ -532,6 +551,14 @@ function updateMemeUI() {
   }
 
   if (!scanText) return;
+
+  if (IS_PHONE) {
+    const holding = currentGesture === "open_palm" && currentGestureScore >= 0.6;
+    scanText.textContent = holding ? "HOLD STILL..." : "SHOW AN OPEN PALM";
+    if (progressFill) progressFill.style.width = holding ? "100%" : "10%";
+    if (helperText) helperText.textContent = holding ? "Keep your palm steady..." : "Hold up one open hand to take a photo";
+    return;
+  }
 
   // Cập nhật dòng chữ hướng dẫn dựa trên trạng thái kéo tay
   if (isFraming) {
