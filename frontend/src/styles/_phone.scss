@@ -206,26 +206,116 @@ html.is-phone {
   .character-picker { left: 10px; bottom: 10px; max-width: calc(100vw - 370px); padding: 8px; }
   .character-card { width: 60px; flex-basis: 60px; }
 
-  /* 9) Đăng nhập: cuộn được, bỏ mascot */
-  /* Trang đăng nhập: cho cuộn được, không bị cắt khi màn hình thấp (điện thoại để ngang) */
+
+  /* 9) Đăng nhập / Đăng ký: hai cột giống giao diện desktop */
   .auth-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+    justify-items: stretch;
+    gap: 8px;
+
+    width: 100%;
     height: 100dvh;
     max-height: 100dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    place-items: start center;
-    align-items: flex-start;       /* tránh lỗi "căn giữa nhưng đầu thẻ bị cắt mất" */
+    padding: 8px 10px;
+
+    overflow: hidden;
+    box-sizing: border-box;
   }
-  .auth-card { margin-block: auto; } /* vẫn căn giữa khi màn hình đủ cao */
+
+  /* Card đăng nhập bên trái */
+  .auth-card {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+    padding: 12px 14px;
+
+    border-radius: 18px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Giữ mascot / khu vực minh họa 3D bên phải */
+  .auth-mascot {
+    display: flex !important;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Thu gọn khoảng cách trong form */
+  .auth-head {
+    margin-bottom: 6px;
+  }
+
+  .auth-brand {
+    margin-bottom: 6px;
+  }
+
+  .auth-divider {
+    margin: 6px 0;
+  }
+
+  .auth-group {
+    margin-bottom: 6px;
+  }
+
+  .auth-card input {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  .auth-card button {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
+  /* Không để các thành phần con làm tràn card */
+  .auth-card > * {
+    min-width: 0;
+    max-width: 100%;
+  }
 
   @media (max-height: 520px) and (orientation: landscape) {
-    .auth-mascot { display: none; }          /* bỏ hình mascot cho đỡ cao */
-    .auth-card { padding-block: 14px; }
-    .auth-brand { margin-bottom: 8px; }
-    .auth-divider { margin: 8px 0; }
-    .auth-group { margin-bottom: 8px; }
+    .auth-layout {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      padding: 6px 10px;
+      gap: 8px;
+    }
+
+    .auth-card {
+      max-height: calc(100dvh - 12px);
+      padding: 9px 12px;
+    }
+
+    .auth-mascot {
+      display: flex !important;
+    }
+
+    .auth-brand {
+      margin-bottom: 4px;
+    }
+
+    .auth-divider {
+      margin: 4px 0;
+    }
+
+    .auth-group {
+      margin-bottom: 5px;
+    }
   }
+
 
 
   /* 10) Snap & Solve: gọn trong MỘT trang, không cuộn */
@@ -378,7 +468,7 @@ html.is-phone {
 
   .puzzle-layout .puzzle-board {
     /* Phóng lớn vừa phải; vẫn giữ nguyên tỷ lệ và tâm của bàn ghép */
-    transform: translateY(8px) scale(1.18);
+    transform: translateY(8px) scale(1.13);
     transform-origin: center center;
   }
 
