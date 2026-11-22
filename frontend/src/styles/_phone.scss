@@ -378,7 +378,7 @@ html.is-phone {
 
   .puzzle-layout .puzzle-board {
     /* Phóng lớn vừa phải; vẫn giữ nguyên tỷ lệ và tâm của bàn ghép */
-    transform: scale(1.18);
+    transform: translateY(8px) scale(1.18);
     transform-origin: center center;
   }
 
