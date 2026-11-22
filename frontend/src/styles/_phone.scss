@@ -93,19 +93,45 @@ html.is-phone {
   /* — Cột trái (nguồn ảnh) — */
   .forge-section-label { margin: 0; font-size: 0.66rem; letter-spacing: 0.08em; }
   .forge-mode-toggle { flex: 0 0 auto; margin: 0; padding: 2px; border-width: 2px; }
+  .multiple-mode-active .forge-mode-toggle { margin-bottom: 0; }
   .forge-mode-btn { min-height: 28px; padding: 2px 10px; font-size: 0.78rem; }
   .forge-upload-headers { flex: 0 0 auto; margin: 0; gap: 8px; }
   .forge-header-col { gap: 4px; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; }
   .forge-card-tag { font-size: 0.62rem; }
-  .forge-upload-grid { flex: 1 1 0; min-height: 0; margin: 0; gap: 8px; }   // thẻ ảnh co giãn theo chiều cao còn lại
-  .forge-upload-card { min-height: 0; height: 100%; border-width: 2px; border-radius: 12px; }
-  .forge-card-visual svg { width: 26px; height: 26px; }
-  .forge-card-text { font-size: 0.74rem; line-height: 1.15; }               // "Choose image" nhỏ lại
-  .forge-action-group { flex: 0 0 auto; margin: 0; gap: 6px; }
-  .forge-action-group button { min-height: 34px; padding: 4px 12px; font-size: 0.85rem; }   // nút Generate thấp xuống, không sát viền
-  #forge-helper-text { display: none; }
+  .forge-upload-grid { flex: 1 1 0; min-height: 0; margin: 0; gap: 8px; }
 
-  /* — Cột phải (kết quả): khung 3D cao ra, toggle + Export thấp lại và dồn xuống đáy — */
+  // Thẻ chọn ảnh co giãn theo chỗ còn lại (cả chế độ Multiple objects, nơi CSS gốc ép cao 240–340px)
+  .forge-upload-card,
+  .multiple-mode-active .forge-upload-card.required { min-height: 0; }
+  .forge-upload-card { height: 100%; border-width: 2px; border-radius: 12px; }
+  .forge-card-visual { width: 44px; height: 44px; }          // icon ảnh to hơn
+  .forge-card-visual svg { width: 100%; height: 100%; }
+  .forge-card-text { font-size: 0.74rem; line-height: 1.15; }
+
+  // Nhóm nút: thấp xuống, cách xa ô ảnh, không còn khoảng trống thừa bên dưới
+  .forge-action-group,
+  .multiple-mode-active .forge-action-group { flex: 0 0 auto; min-height: 36px; margin-top: 10px; }
+  .forge-action-group > .forge-submit-btn {
+    min-height: 34px; height: 34px; padding-block: 0; font-size: 0.85rem;
+  }
+  .forge-multi-actions { --forge-actions-gap: 6px; }
+  .forge-multi-actions .forge-submit-btn {
+    min-height: 34px; height: 34px; padding-block: 0; padding-left: 6px;
+    font-size: 0.66rem; letter-spacing: 0; gap: 5px; white-space: nowrap;   // chữ nhỏ lại cho vừa nút
+    svg { width: 15px; height: 15px; }
+  }
+
+  // Ô mô tả Magic Wand: gọn lại để không bị ô ảnh đè
+  .forge-prompt-card { flex: 0 0 auto; gap: 4px; }
+  .forge-source-panel.is-magic-prompt-active .forge-prompt-card,
+  .forge-source-panel.multiple-mode-active.is-magic-prompt-active .forge-prompt-card {
+    max-height: 88px; margin-top: 0; padding: 6px 10px; border-width: 2px; border-radius: 12px;
+  }
+  .forge-prompt-label { font-size: 0.6rem; letter-spacing: 0.1em; }
+  .forge-prompt-input { min-height: 36px; padding: 4px 8px; font-size: 0.76rem; line-height: 1.25; resize: none; border-radius: 9px; }
+  #forge-helper-text, .forge-helper-text { display: none; }
+
+  /* — Cột phải (kết quả) — */
   .forge-output-header { flex: 0 0 auto; margin: 0; }
   .result-hint { font-size: 0.66rem; }
   .forge-output-stage { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
@@ -118,8 +144,22 @@ html.is-phone {
   .forge-export-model-btn,
   .forge-export-btn { min-height: 34px; padding: 4px 10px; font-size: 0.74rem; }
 
-  /* Thanh credits: đưa lên góc phải trên màn hình */
-  .forge-magic-credits { position: fixed; top: 8px; right: 12px; width: 150px; }
+  /* Thẻ credits: thấp hơn và dịch lên sát mép trên */
+  .forge-magic-credits {
+    position: fixed;
+    top: 3px;
+    right: 10px;
+    width: 132px;
+    gap: 3px;
+    padding: 4px 10px 5px;
+    border-radius: 11px;
+    .forge-magic-credits-label {
+      gap: 6px;
+      font-size: 0.72rem;
+      &::before { width: 14px; height: 14px; }
+    }
+    .forge-magic-credits-track { height: 5px; }
+  }
 
   /* 6) Magic Tree: iframe cao gần hết màn hình */
   .magic-tree-modal { overflow: hidden !important; }
@@ -182,9 +222,11 @@ html.is-phone {
   .hl-helper-text { font-size: 0.8rem; margin: 0; }
 
   #tab-snap-solve:has(#hl-level-view[style*="flex"]) {
-    grid-template-columns: 190px minmax(0, 1fr);   // cột trái hẹp lại, cột chơi rộng ra
+    grid-template-columns: 190px minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     column-gap: 10px;
+    height: calc(100dvh - 70px);        // chiều cao rõ ràng: nếu không có, hàng 1fr giãn theo nội dung rồi tràn
+    max-height: calc(100dvh - 70px);
   }
   #tab-snap-solve:has(#hl-level-view[style*="flex"]) .hl-helper-text {
     flex-wrap: nowrap;
@@ -199,9 +241,10 @@ html.is-phone {
   }
   .hl-pill { padding: 2px 8px; font-size: 0.66rem; }
 
-  .puzzle-layout .puzzle-left-col { gap: 6px; }
-  .puzzle-layout .puzzle-cam-box { padding: 6px; gap: 0; border-radius: 12px; }
-  .puzzle-layout .puzzle-cam-view { aspect-ratio: 16 / 9; border-width: 2px; border-radius: 10px; }   // webcam nhỏ lại
+  // Cột trái: webcam chiếm phần còn lại (dài xuống), các card còn lại giữ chiều cao đúng nội dung
+  .puzzle-layout .puzzle-left-col { gap: 6px; min-height: 0; }
+  .puzzle-layout .puzzle-cam-box { flex: 1 1 0; min-height: 0; padding: 6px; gap: 0; border-radius: 12px; }
+  .puzzle-layout .puzzle-cam-view { flex: 1 1 0; min-height: 80px; aspect-ratio: auto; border-width: 2px; border-radius: 10px; }
   .puzzle-layout .cam-hint { display: none; }
   .puzzle-progress-wrap { width: auto; padding: 4px 10px; }
   .puzzle-progress-wrap .puzzle-progress-text { font-size: 0.78rem; }
@@ -213,5 +256,6 @@ html.is-phone {
   .puzzle-actions { gap: 6px; margin-top: 0; }
   .puzzle-actions .hl-action-btn { padding: 6px 10px; font-size: 0.75rem; }
 
+  // Bàn xếp hình: nằm gọn trong card, chừa lề cho các tai ghép lồi ra
   .puzzle-board-container { min-height: 0; padding: 8px 12px; }
-  .puzzle-board { height: 86%; margin-top: -8px; }                          // bàn xếp hình to ra
+  .puzzle-board { height: 84%; margin-top: 0; }
