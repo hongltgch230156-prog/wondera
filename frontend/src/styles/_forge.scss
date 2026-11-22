@@ -1328,3 +1328,10 @@
 body > .bill-root {
   z-index: 2147483000;
 }
+
+// Hiện thẻ credits khi JS đã bỏ aria-hidden, không cần phụ thuộc chế độ Magic Wand
+.forge-output-panel .forge-magic-credits:not([aria-hidden="true"]) {
+  max-height: 64px;      // 40px của luật gốc cắt mất thanh tiến độ vì thẻ đã được tạo kiểu lại trong billing.scss
+  opacity: 1;
+  transform: translateY(0);
+}

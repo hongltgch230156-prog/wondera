@@ -252,7 +252,18 @@ html.is-phone {
   .auth-switch { margin: 8px 0 0; font-size: 12px; button { font-size: 12px; } }
   .auth-error { margin: 0 0 6px; padding: 6px 10px; font-size: 11.5px; }
 
-
+  /* 9.1) Chế độ Đăng ký: có thêm ô Confirm Password nên thu gọn hơn để vẫn vừa MỘT màn hình */
+  .auth-root[data-mode="register"] {
+    .auth-mascot { display: none; }           // bỏ cô bé vẫy tay (đang đè lên dòng tagline), tiết kiệm ~42px
+    .auth-card { padding: 8px 18px; }
+    .auth-google { height: 34px; }
+    .auth-divider { margin: 6px 0 4px; }
+    .auth-group { margin-bottom: 4px; }
+    .auth-label-row { margin-bottom: 2px; }
+    .auth-input { height: 32px; }
+    .auth-submit { height: 36px; }
+    .auth-switch { margin-top: 6px; }
+  }
 
   /* 10) Snap & Solve: gọn trong MỘT trang, không cuộn */
   #tab-snap-solve {
@@ -404,7 +415,7 @@ html.is-phone {
 
   .puzzle-layout .puzzle-board {
     /* Phóng lớn vừa phải; vẫn giữ nguyên tỷ lệ và tâm của bàn ghép */
-    transform: translateY(10px) scale(1.13);
+    transform: translateY(10px) scale(1.1);
     transform-origin: center center;
   }
 
@@ -450,6 +461,6 @@ html.is-phone {
 
 /* Màn hình loading trên điện thoại để ngang: tách hai dòng chữ phía dưới */
 @media (pointer: coarse) and (max-height: 520px) {
-  .no-sound-button { bottom: 22%; }                    // dòng "sound on, bestie" lên cao hơn
+  .no-sound-button { bottom: 17%; }                    // dòng "sound on, bestie" lên cao hơn
   .instructions { bottom: 7%; font-size: 22px; }       // dòng "Rotate horizontally" xuống thấp hơn, chữ nhỏ lại
 }
