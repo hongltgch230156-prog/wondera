@@ -1335,3 +1335,16 @@ body > .bill-root {
   opacity: 1;
   transform: translateY(0);
 }
+
+// Thẻ credits 3D Forge: nằm ở hàng tiêu đề, bên phải. Không bị overflow của .forge-body cắt, không đè lên card.
+.forge-output-panel .forge-magic-credits {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 210px;
+  margin: 0;
+  z-index: 5;
+}
+@media (max-width: 900px) {
+  .forge-output-panel .forge-magic-credits { width: 170px; }
+}
