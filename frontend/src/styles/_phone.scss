@@ -161,6 +161,18 @@ html.is-phone {
     .forge-magic-credits-track { height: 5px; }
   }
 
+  /* 6) Magic Tree: iframe cao gần hết màn hình */
+  .magic-tree-modal { overflow: hidden !important; }
+  .magic-tree-modal .forge-header { min-height: 0; margin: 0 0 4px; }
+  .magic-tree-container {
+    height: calc(100dvh - 56px);
+    min-height: 0;
+    border-width: 3px;
+    border-radius: 16px;
+  }
+  .magic-tree-container > iframe,
+  .magic-tree-container > div { height: 100%; min-height: 0; }
+
   /* 7) Tài khoản: gọn lại */
   .account-root { padding: 0; }
   .account-card { width: min(760px, 100vw); height: 100dvh; max-height: 100dvh; border-radius: 0; border-width: 0; }
@@ -203,6 +215,100 @@ html.is-phone {
   }
   .auth-card { margin-block: auto; flex-basis: 360px; width: 360px; padding: 14px 20px 16px; }
   .auth-mascot { display: none; }
-}
 
- 
+  /* 10) Snap & Solve: gọn trong MỘT trang, không cuộn */
+  #tab-snap-solve { overflow: hidden; }
+  .hl-helper-text { font-size: 0.8rem; margin: 0; }
+
+  #tab-snap-solve:has(#hl-level-view[style*="flex"]) {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+
+      column-gap: 10px;
+
+      height: calc(100dvh - 90px);
+      max-height: calc(100dvh - 90px);
+      min-height: 0;
+
+      box-sizing: border-box;
+      overflow: hidden;
+  }
+  #tab-snap-solve:has(#hl-level-view[style*="flex"]) .hl-helper-text {
+    flex-wrap: nowrap;
+    gap: 6px;
+    column-gap: 6px;
+    min-height: 28px;
+    margin: 0 0 6px;
+    padding: 3px 8px;
+    font-size: 0.66rem;
+    border-width: 2px;
+    border-radius: 10px;
+  }
+  .hl-pill { padding: 2px 8px; font-size: 0.66rem; }
+
+  // Cột trái: webcam chiếm phần còn lại (dài xuống), các card còn lại giữ chiều cao đúng nội dung
+  .puzzle-layout .puzzle-left-col { gap: 6px; min-height: 0; }
+  .puzzle-layout .puzzle-cam-box { flex: 1 1 0; min-height: 0; padding: 6px; gap: 0; border-radius: 12px; }
+  .puzzle-layout .puzzle-cam-view { flex: 1 1 0; min-height: 80px; aspect-ratio: auto; border-width: 2px; border-radius: 10px; }
+  .puzzle-layout .cam-hint { display: none; }
+  .puzzle-progress-wrap { width: auto; padding: 4px 10px; }
+  .puzzle-progress-wrap .puzzle-progress-text { font-size: 0.78rem; }
+  .puzzle-progress-wrap .puzzle-progress-bar { height: 8px; }
+  .puzzle-layout .puzzle-level-select { padding: 6px 8px; }
+  .puzzle-layout .level-header { margin-bottom: 4px; font-size: 0.62rem; }
+  .puzzle-layout .level-dots .level-dot { width: 26px; height: 26px; font-size: 0.75rem; }
+  .puzzle-layout .level-dots .level-arrow { width: 22px; height: 22px; }
+  .puzzle-actions { gap: 6px; margin-top: 0; }
+  .puzzle-actions .hl-action-btn { padding: 6px 10px; font-size: 0.75rem; }
+
+  /* Khu vực chứa bàn ghép */
+  .puzzle-board-container {
+      min-height: 0;
+      min-width: 0;
+
+      height: 100%;
+      padding: 8px 12px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      overflow: hidden;
+      box-sizing: border-box;
+  }
+
+  /* Bàn ghép 12 mảnh */
+  .puzzle-board {
+      height: 100%;
+      width: auto;
+
+      max-height: 100%;
+      max-width: 100%;
+
+      aspect-ratio: 4 / 3;
+
+      margin: 0 auto;
+      flex-shrink: 1;
+      min-width: 0;
+      box-sizing: border-box;
+
+  }
+
+  /* Các khu vực trong layout phải được phép co lại */
+  .puzzle-layout {
+      min-height: 0;
+      height: 100%;
+  }
+
+  .puzzle-layout .puzzle-right-col {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+  }
+
+  .puzzle-layout .puzzle-left-col {
+      min-height: 0;
+      overflow: hidden;
+  }
+}
