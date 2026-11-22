@@ -207,14 +207,26 @@ html.is-phone {
   .character-card { width: 60px; flex-basis: 60px; }
 
   /* 9) Đăng nhập: cuộn được, bỏ mascot */
+  /* Trang đăng nhập: cho cuộn được, không bị cắt khi màn hình thấp (điện thoại để ngang) */
   .auth-layout {
+    height: 100dvh;
+    max-height: 100dvh;
     overflow-y: auto;
-    align-items: flex-start;
-    padding: 10px 4vw;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    place-items: start center;
+    align-items: flex-start;       /* tránh lỗi "căn giữa nhưng đầu thẻ bị cắt mất" */
   }
-  .auth-card { margin-block: auto; flex-basis: 360px; width: 360px; padding: 14px 20px 16px; }
-  .auth-mascot { display: none; }
+  .auth-card { margin-block: auto; } /* vẫn căn giữa khi màn hình đủ cao */
+
+  @media (max-height: 520px) and (orientation: landscape) {
+    .auth-mascot { display: none; }          /* bỏ hình mascot cho đỡ cao */
+    .auth-card { padding-block: 14px; }
+    .auth-brand { margin-bottom: 8px; }
+    .auth-divider { margin: 8px 0; }
+    .auth-group { margin-bottom: 8px; }
+  }
+
 
   /* 10) Snap & Solve: gọn trong MỘT trang, không cuộn */
   #tab-snap-solve {
@@ -356,5 +368,56 @@ html.is-phone {
     min-height: 0;
     min-width: 0;
     overflow: hidden;
+  }
+
+  /* 10.1) Tinh chỉnh kích thước bàn ghép và điều khiển level */
+  .puzzle-layout .puzzle-board-container {
+    /* Nới vùng sử dụng bên trong card để bàn ghép có thêm không gian */
+    padding: 12px 18px;
+  }
+
+  .puzzle-layout .puzzle-board {
+    /* Phóng lớn vừa phải; vẫn giữ nguyên tỷ lệ và tâm của bàn ghép */
+    transform: scale(1.18);
+    transform-origin: center center;
+  }
+
+  .puzzle-layout .level-dots .level-arrow {
+    /* Căn nút mũi tên lên ngang tâm các nút level */
+    transform: translateY(-4px);
+  }
+
+  /* Thu nhỏ badge hoàn thành nếu dấu tích được render bằng phần tử con */
+  .puzzle-layout .level-dots .level-dot .level-check,
+  .puzzle-layout .level-dots .level-dot .level-checkmark,
+  .puzzle-layout .level-dots .level-dot .check-mark,
+  .puzzle-layout .level-dots .level-dot .level-complete-badge,
+  .puzzle-layout .level-dots .level-dot .completed-badge,
+  .puzzle-layout .level-dots .level-dot [class*="check"] {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
+    font-size: 9px;
+    line-height: 14px;
+  }
+
+  .puzzle-layout .level-dots .level-dot.completed::after,
+  .puzzle-layout .level-dots .level-dot.is-completed::after,
+  .puzzle-layout .level-dots .level-dot.done::after,
+  .puzzle-layout .level-dots .level-dot[data-completed="true"]::after {
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    line-height: 14px;
+  }
+
+  .puzzle-layout .level-dots .level-dot .level-check svg,
+  .puzzle-layout .level-dots .level-dot .level-checkmark svg,
+  .puzzle-layout .level-dots .level-dot .check-mark svg,
+  .puzzle-layout .level-dots .level-dot .level-complete-badge svg,
+  .puzzle-layout .level-dots .level-dot .completed-badge svg {
+    width: 9px;
+    height: 9px;
   }
 }
