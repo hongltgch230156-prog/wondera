@@ -311,4 +311,15 @@ html.is-phone {
       min-height: 0;
       overflow: hidden;
   }
+  /* Cân chỉnh card bàn ghép xuống thấp hơn */
+  .puzzle-layout .puzzle-board-container {
+      position: relative;
+      top: 10px;
+
+      /* Tạo khoảng đệm để tai ghép không bị lẹm */
+      padding: 14px 18px;
+
+      box-sizing: border-box;
+      overflow: hidden;
+  }
 }
