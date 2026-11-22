@@ -3,6 +3,11 @@ import { captureMemeSnapshot, resetAutoScan, setOnHandTracking } from "./memeDet
 import { readProgress, writeProgress, syncProgress } from "./gameProgress.js";
 import { icon as ic, POSE_SVG, LOCK_SVG, launchCelebration } from "./handlabIcons.js";
 import { OneEuro } from "./handMath.js";
+import { IS_PHONE } from "./device.js";
+
+const SNAP_HINT = IS_PHONE
+    ? "Hold up one open hand to take a photo."
+    : "Use 2 hands to frame your face. Expand to capture.";
 let stopCelebration = null;
 
 function sleep(ms) {
@@ -99,6 +104,7 @@ function buildPieceSvg(id, row, col, shapePath, imageSrc) {
 
 export function initSnapSolve() {
     console.log("[Snap & Solve] Initialized.");
+    setHint(SNAP_HINT);
 }
 
 let captureToken = 0; // tăng khi rời tab để hủy đếm ngược 3-2-1 đang dở
@@ -157,7 +163,7 @@ export function stopSnapSolve() {
     if (scanOverlay) scanOverlay.style.display = "flex";
     if (countdown) { countdown.textContent = ""; countdown.classList.remove("is-visible"); }
     if (helperText) helperText.classList.remove("is-win");
-    setHint("Use 2 hands to frame your face. Expand to capture.");
+    setHint(SNAP_HINT);
     resetAutoScan();
 }
 
@@ -1331,7 +1337,7 @@ export function startPuzzleGame(imageSrc, levelId) {
         if (levelView) levelView.style.display = "none";
         const scanOverlay = document.querySelector("#tab-snap-solve .hl-scan-overlay");
         if (scanOverlay) scanOverlay.style.display = 'flex';
-        setHint("Use 2 hands to frame your face. Expand to capture.");
+        setHint(SNAP_HINT);
         resetAutoScan();
     };
 }
