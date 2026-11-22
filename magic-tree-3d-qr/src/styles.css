@@ -426,6 +426,41 @@ button { font: inherit; color: inherit; }
   .brand__text { display: none; }
 }
 
+/* Màn hình ngang chiều cao thấp (ví dụ 780 x 360) */
+@media (max-height: 460px) {
+  .stage {
+    justify-content: flex-start;
+    padding-top: 8px;
+    padding-bottom: 6px;
+  }
+
+  .stage__canvas {
+    width: min(76vw, 680px);
+    height: auto;
+    flex: 1 1 auto;
+    min-height: 120px;
+    max-height: 185px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  .info__card {
+    max-height: 62dvh;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .info__card ol {
+    gap: 6px;
+  }
+
+  .info__card li {
+    font-size: 11.5px;
+    line-height: 1.25;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hint, .season, .tree, .blossom, .field__action { transition: none; }
 }

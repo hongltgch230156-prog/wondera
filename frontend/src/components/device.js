@@ -3,3 +3,5 @@
 export const IS_PHONE =
   window.matchMedia("(pointer: coarse)").matches &&
   Math.min(screen.width, screen.height) < 600;
+
+document.documentElement.classList.toggle("is-phone", IS_PHONE);

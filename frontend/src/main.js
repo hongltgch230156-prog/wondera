@@ -15,6 +15,7 @@ import { openHandLab, closeHandLab } from "./components/handlab.js";
 import { initAuth, API_BASE } from "./components/auth.js";
 import { createVoiceApi } from "./components/voice.js";
 import { isMobileOrLowEnd, getModelUrl, disposeObject3D } from "./utils/mobile3d.js";
+import "./components/device.js";
 initAuth();
 
 /** -------------------------- Audio setup -------------------------- */

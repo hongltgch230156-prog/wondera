@@ -1,0 +1,92 @@
+// Tối ưu cho ĐIỆN THOẠI. Chỉ có hiệu lực khi <html> có class "is-phone" (do device.js thêm vào).
+html.is-phone {
+  /* 1) Mọi modal: phủ kín màn hình, tự cuộn bên trong */
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    padding: 8px 12px;
+    border-width: 0;
+    border-radius: 0;
+    overflow-x: hidden;
+    overflow-y: auto !important;       // _responsive.scss đang ép overflow: visible !important
+    overscroll-behavior: contain;
+  }
+
+  /* 2) Nút X: đưa vào trong màn hình, nhỏ gọn */
+  .modal .modal-exit-button,
+  .hand-lab-modal > .forge-modal > .modal-exit-button {
+    position: fixed;
+    top: 6px;
+    left: 6px;
+    right: auto;
+    bottom: auto;
+    transform: none;
+    padding: 6px;
+    border-width: 4px;
+    border-radius: 12px;
+    z-index: 60;
+    &:hover { transform: none; }
+    .exit-button-svg { width: 18px; height: 18px; }
+  }
+
+  /* 3) Hand Lab: bỏ tiêu đề, thu nhỏ tab, nhường chỗ cho nút X */
+  .hand-lab-modal {
+    padding: 6px 10px 8px;
+    .hl-header { display: none; }
+    .hl-tabs-wrapper { margin: 0 0 6px 46px; padding: 3px; }
+    .hl-tab-btn { min-height: 30px; font-size: 0.72rem; }
+    .hl-tab-content { padding-right: 0; padding-bottom: 8px; }
+  }
+  .hl-camera-viewport,
+  .hl-meme-viewport,
+  .hl-camera-viewport.hl-snap-viewport {
+    height: calc(100dvh - 92px);
+    min-height: 160px;
+    margin-bottom: 8px;
+  }
+  .puzzle-board-container { min-height: calc(100dvh - 92px); }
+
+  /* 4) Puppet Stage: không xếp cột dọc; sân khấu phủ kín (webcam + thẻ chọn nằm trong ngăn kéo) */
+  .ps-layout { flex-direction: row; overflow: hidden; }
+  .ps-main { min-height: 0; }
+
+  /* 5) 3D Forge: giữ 2 cột như bản rộng, thay vì xếp 1 cột */
+  .forge-header { min-height: 0; margin: 0 0 6px; padding-inline: 48px; }
+  .forge-title { padding: 3px 14px; font-size: 1rem; }
+  .forge-body,
+  .forge-body.magic-wand-active {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
+    max-height: calc(100dvh - 64px);
+    gap: 10px;
+  }
+  .forge-viewer { height: calc(100dvh - 120px); min-height: 150px; }
+
+  /* 6) Magic QR (iframe) */
+  .magic-tree-container,
+  .magic-tree-container > iframe,
+  .magic-tree-container > div { min-height: calc(100dvh - 60px); }
+
+  /* 7) Đăng nhập: cuộn được, bỏ mascot cho đỡ cao */
+  .auth-layout {
+    overflow-y: auto;
+    align-items: flex-start;
+    padding: 10px 4vw;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .auth-card { margin-block: auto; flex-basis: 360px; width: 360px; padding: 14px 20px 16px; }
+  .auth-mascot { display: none; }
+
+  /* 8) Nút âm thanh / giao diện sáng-tối ở góc phải: nhỏ lại */
+  .toggle-buttons { border-width: 4px; padding: 6px; border-radius: 0.9rem; }
+  .mute-toggle-button { top: 10px; right: 64px; }
+  .theme-toggle-button { top: 10px; right: 12px; }
+  .sound-svg, .sound-off-svg, .sun-svg, .moon-svg { width: 24px; height: 24px; }
+}
