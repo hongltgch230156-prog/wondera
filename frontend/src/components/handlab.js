@@ -8,6 +8,7 @@ import {
     setOnHandTracking,
     resetAutoScan
 } from "./memeDetector.js";
+import { IS_PHONE } from "./device.js";
 
 import { startPuppetStage, stopPuppetStage } from "./puppet/puppetStage.js";
 
@@ -142,6 +143,8 @@ export function initHandLab() {
 
   handLabSwitchTab = switchTab;
 
+  if (IS_PHONE) document.querySelectorAll(".hl-helper-text").forEach((el) => { el.textContent = "Hold up one open hand to take a photo"; });
+
   tabButtons.forEach((button) => {
     button.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -254,7 +257,7 @@ function resetMemeSearch() {
     ui.snapshotImage.removeAttribute("src");        // xóa luôn ảnh chụp mặt khỏi trang
   }
   if (ui.captureButton) ui.captureButton.disabled = false;
-  if (ui.helperText) ui.helperText.textContent = "Use 2 hands to frame your face";
+  if (ui.helperText) ui.helperText.textContent = IS_PHONE ? "Hold up one open hand to take a photo" : "Use 2 hands to frame your face";
   const input = document.getElementById("hl-search-input");
   if (input) { input.value = ""; input.dispatchEvent(new Event("input")); }
   document.querySelector('.hl-result-tab[data-result-tab="gifs"]')?.click(); // về tab GIFs

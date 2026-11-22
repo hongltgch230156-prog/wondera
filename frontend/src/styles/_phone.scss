@@ -1,6 +1,14 @@
-// Tối ưu cho ĐIỆN THOẠI. Chỉ có hiệu lực khi <html> có class "is-phone" (do device.js thêm vào).
+// frontend/src/styles/_phone.scss  (v2)
+// Chỉ có hiệu lực khi <html> có class "is-phone". Tablet / laptop không bị ảnh hưởng.
 html.is-phone {
-  /* 1) Mọi modal: phủ kín màn hình, tự cuộn bên trong */
+  /* 0) Ẩn thanh cuộn nhưng vẫn cuộn được */
+  .modal, .forge-source-panel, .forge-output-panel, .account-scroll,
+  .chat-messages, .hl-tab-content, .auth-layout {
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  /* 1) Mọi modal: phủ kín màn hình */
   .modal {
     position: fixed;
     top: 0;
@@ -15,18 +23,19 @@ html.is-phone {
     border-width: 0;
     border-radius: 0;
     overflow-x: hidden;
-    overflow-y: auto !important;       // _responsive.scss đang ép overflow: visible !important
+    overflow-y: auto !important;
     overscroll-behavior: contain;
   }
 
-  /* 2) Nút X: đưa vào trong màn hình, nhỏ gọn */
+  /* 2) Nút X: vào trong màn hình (dùng !important để thắng luật .work.modal ... của Forge) */
   .modal .modal-exit-button,
+  .work.modal .forge-modal > .modal-exit-button,
   .hand-lab-modal > .forge-modal > .modal-exit-button {
-    position: fixed;
-    top: 6px;
-    left: 6px;
-    right: auto;
-    bottom: auto;
+    position: fixed !important;
+    top: 6px !important;
+    left: 6px !important;
+    right: auto !important;
+    bottom: auto !important;
     transform: none;
     padding: 6px;
     border-width: 4px;
@@ -36,7 +45,14 @@ html.is-phone {
     .exit-button-svg { width: 18px; height: 18px; }
   }
 
-  /* 3) Hand Lab: bỏ tiêu đề, thu nhỏ tab, nhường chỗ cho nút X */
+  /* 3) Ba nút góc phải: âm thanh, sáng/tối, tài khoản nằm cạnh nhau */
+  .toggle-buttons { border-width: 4px; padding: 6px; border-radius: 0.9rem; }
+  .theme-toggle-button { top: 10px; right: 12px; }
+  .mute-toggle-button { top: 10px; right: 64px; }
+  .account-button { top: 10px; right: 116px; }
+  .sound-svg, .sound-off-svg, .sun-svg, .moon-svg, .account-svg { width: 24px; height: 24px; }
+
+  /* 4) Hand Lab */
   .hand-lab-modal {
     padding: 6px 10px 8px;
     .hl-header { display: none; }
@@ -44,49 +60,94 @@ html.is-phone {
     .hl-tab-btn { min-height: 30px; font-size: 0.72rem; }
     .hl-tab-content { padding-right: 0; padding-bottom: 8px; }
   }
-  .hl-camera-viewport,
-  .hl-meme-viewport,
-  .hl-camera-viewport.hl-snap-viewport {
-    height: calc(100dvh - 92px);
-    min-height: 160px;
-    margin-bottom: 8px;
-  }
+  .hl-camera-viewport { height: calc(100dvh - 92px); min-height: 160px; margin-bottom: 8px; }
+  .hl-meme-viewport { height: calc(100dvh - 152px); min-height: 120px; }   // phía trên còn ô tìm kiếm
   .puzzle-board-container { min-height: calc(100dvh - 92px); }
-
-  /* 4) Puppet Stage: không xếp cột dọc; sân khấu phủ kín (webcam + thẻ chọn nằm trong ngăn kéo) */
   .ps-layout { flex-direction: row; overflow: hidden; }
   .ps-main { min-height: 0; }
 
-  /* 5) 3D Forge: giữ 2 cột như bản rộng, thay vì xếp 1 cột */
+  /* 5) 3D Forge: 2 cột, mỗi cột tự cuộn, không ép chiều cao 620px */
   .forge-header { min-height: 0; margin: 0 0 6px; padding-inline: 48px; }
-  .forge-title { padding: 3px 14px; font-size: 1rem; }
+  .forge-title { min-width: 0; padding: 3px 14px; font-size: 0.95rem; border-width: 3px; }
   .forge-body,
   .forge-body.magic-wand-active {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
-    max-height: calc(100dvh - 64px);
     gap: 10px;
+    min-height: 0;
+    height: calc(100dvh - 58px);
+    max-height: none;
+    overflow: hidden;
   }
-  .forge-viewer { height: calc(100dvh - 120px); min-height: 150px; }
+  .forge-source-panel,
+  .forge-output-panel {
+    min-height: 0;
+    height: 100%;
+    padding: 8px 10px;
+    border-width: 3px;
+    border-radius: 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .forge-section-label { font-size: 0.72rem; letter-spacing: 0.1em; }
+  .forge-mode-toggle { margin: 2px 0 8px; padding: 2px; border-width: 2px; }
+  .forge-mode-btn { min-height: 30px; font-size: 0.8rem; }
+  .forge-upload-grid { gap: 8px; margin-bottom: 8px; }
+  .forge-upload-card { min-height: 110px; border-width: 2px; border-radius: 12px; }
+  .forge-viewer { height: clamp(140px, calc(100dvh - 190px), 260px); min-height: 0; }
 
-  /* 6) Magic QR (iframe) */
-  .magic-tree-container,
+  /* 6) Magic Tree: iframe lấp đầy phần còn lại, không còn thanh cuộn */
+  .magic-tree-modal { display: flex; flex-direction: column; overflow: hidden !important; }
+  .magic-tree-modal .forge-header { min-height: 0; margin: 0 0 4px; }
+  .magic-tree-container {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    border-width: 3px;
+    border-radius: 16px;
+  }
   .magic-tree-container > iframe,
-  .magic-tree-container > div { min-height: calc(100dvh - 60px); }
+  .magic-tree-container > div { min-height: 0; height: 100%; }
 
-  /* 7) Đăng nhập: cuộn được, bỏ mascot cho đỡ cao */
+  /* 7) Tài khoản: gọn lại */
+  .account-root { padding: 0; }
+  .account-card { width: min(760px, 100vw); height: 100dvh; max-height: 100dvh; border-radius: 0; border-width: 0; }
+  .account-head { padding: 8px 14px 2px; h2 { font-size: 1.2rem; } }
+  .account-close { width: 32px; height: 32px; .acc-ic { width: 20px; height: 20px; } }
+  .account-scroll { padding: 6px 14px 14px; gap: 10px; }
+  .account-profile { gap: 12px; }
+  .account-avatar { width: 56px; height: 56px; span { font-size: 1.3rem; } }
+  .account-name { font-size: 1.1rem; }
+  .account-email { font-size: 0.8rem; }
+  .account-pill { padding: 5px 10px; font-size: 0.8rem; }
+  .account-stats { padding: 6px 0; border-radius: 14px; }
+  .account-stat { strong { font-size: 1.25rem; } span { font-size: 0.8rem; } }
+  .account-tab { padding: 7px 8px; font-size: 0.85rem; }
+
+  /* 8) Chatbot: gọn, chừa chỗ cho 3 nút ở góc trên */
+  .chat-panel {
+    right: 10px;
+    bottom: 10px;
+    width: min(340px, 52vw);
+    height: calc(100dvh - 74px);
+    border-radius: 16px;
+  }
+  .panel-header { padding: 8px 12px; gap: 8px; }
+  .buddy-heading img { width: 32px; height: 32px; border-radius: 9px; }
+  .buddy-heading h2 { font-size: 14px; }
+  .buddy-heading p { display: none; }
+  #close-chat, #choose-buddy, #close-picker { width: 30px; height: 30px; flex-basis: 30px; border-radius: 9px; }
+  .msg-bubble { font-size: 13px; padding: 7px 10px; }
+  .chat-form { padding: 6px 8px; gap: 6px; }
+  .character-picker { left: 10px; bottom: 10px; max-width: calc(100vw - 370px); padding: 8px; }
+  .character-card { width: 60px; flex-basis: 60px; }
+
+  /* 9) Đăng nhập: cuộn được, bỏ mascot */
   .auth-layout {
     overflow-y: auto;
     align-items: flex-start;
     padding: 10px 4vw;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
   }
   .auth-card { margin-block: auto; flex-basis: 360px; width: 360px; padding: 14px 20px 16px; }
   .auth-mascot { display: none; }
-
-  /* 8) Nút âm thanh / giao diện sáng-tối ở góc phải: nhỏ lại */
-  .toggle-buttons { border-width: 4px; padding: 6px; border-radius: 0.9rem; }
-  .mute-toggle-button { top: 10px; right: 64px; }
-  .theme-toggle-button { top: 10px; right: 12px; }
-  .sound-svg, .sound-off-svg, .sun-svg, .moon-svg { width: 24px; height: 24px; }
 }
