@@ -1336,15 +1336,19 @@ body > .bill-root {
   transform: translateY(0);
 }
 
-// Thẻ credits 3D Forge: nằm ở hàng tiêu đề, bên phải. Không bị overflow của .forge-body cắt, không đè lên card.
-.forge-output-panel .forge-magic-credits {
+// Thẻ credits 3D Forge (laptop / tablet): nằm ở hàng tiêu đề, bên phải, thấp và gọn
+html:not(.is-phone) .forge-output-panel div.forge-magic-credits {
   position: fixed;
-  top: 20px;
+  top: 56px;                 // dịch xuống so với bản trước (20px)
   right: 20px;
   width: 210px;
+  gap: 5px;                  // gốc 8px
   margin: 0;
+  padding: 6px 14px 7px;     // gốc 10px 14px 11px, đây là chỗ làm thẻ ngắn lại
   z-index: 5;
+  .forge-magic-credits-label { font-size: 0.88rem; }
+  .forge-magic-credits-track { height: 7px; }
 }
 @media (max-width: 900px) {
-  .forge-output-panel .forge-magic-credits { width: 170px; }
+  html:not(.is-phone) .forge-output-panel div.forge-magic-credits { width: 170px; }
 }
