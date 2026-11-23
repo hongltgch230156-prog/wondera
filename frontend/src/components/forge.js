@@ -9,6 +9,7 @@ import { FBXExporter } from '@comfyorg/fbx-exporter-three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { fetchWallet, onWalletChange, notifyOutOfCredits } from "./billing.js";
 import { API_BASE } from './auth.js';
+import { isMobileOrLowEnd } from "../utils/mobile3d.js";
 
 export function initForge() {
   const forgeModeButtons = document.querySelectorAll(".forge-mode-btn");
