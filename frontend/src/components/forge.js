@@ -1,6 +1,6 @@
 // frontend/src/components/forge.js
 import * as THREE from 'three';
-import { GLTFLoFader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
