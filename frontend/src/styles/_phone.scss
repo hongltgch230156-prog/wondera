@@ -63,7 +63,7 @@ html.is-phone {
     .hl-tab-content { padding-right: 0; padding-bottom: 8px; }
   }
   .hl-camera-viewport { height: calc(100dvh - 92px); min-height: 160px; margin-bottom: 8px; }
-  .hl-meme-viewport { height: calc(100dvh - 152px); min-height: 120px; }   // phía trên còn ô tìm kiếm
+  .hl-meme-viewport { height: calc(100dvh - 136px); min-height: 120px; }   // camera dài ra; dòng hướng dẫn vẫn nằm ngay dưới, YOUR VIBE / RE-SCAN cuộn xuống xem
   .ps-layout { flex-direction: row; overflow: hidden; }
   .ps-main { min-height: 0; }
 
@@ -163,6 +163,33 @@ html.is-phone {
     .forge-magic-credits-track { height: 5px; }
   }
 
+  /* 5.1) Menu Export 3D / 2D: thu nhỏ để vừa màn hình thấp, không tràn mép phải */
+  .forge-export-menu {
+    width: 230px;
+    padding: 5px;
+    border-width: 2px;
+    border-radius: 14px;
+    bottom: calc(100% + 8px);
+  }
+  .forge-export-2d-menu { left: auto; right: 0; }          // mở sang trái
+  .forge-export-menu-title { margin: 0 0 2px; padding: 4px 8px 6px; font-size: 0.62rem; }
+  .forge-export-menu-subtitle { padding: 0 8px 6px; font-size: 0.62rem; line-height: 1.25; }
+  .forge-export-option {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 9px;
+    min-height: 40px;
+    padding: 4px 8px;
+  }
+  .forge-export-image-option { grid-template-columns: 40px minmax(0, 1fr); min-height: 44px; }
+  .forge-export-format-tag { min-height: 26px; border-width: 2px; border-radius: 8px; font-size: 0.6rem; }
+  .forge-export-image-icon { width: 16px; height: 16px; }
+  .forge-export-option-copy {
+    gap: 1px;
+    strong { font-size: 0.78rem; }
+    small { font-size: 0.6rem; line-height: 1.2; }
+  }
+  .forge-export-status { margin: 4px 6px 2px; font-size: 0.66rem; }
+
   /* 6) Magic Tree: iframe cao gần hết màn hình */
   .magic-tree-modal { overflow: hidden !important; }
   .magic-tree-modal .forge-header { min-height: 0; margin: 0 0 4px; }
@@ -192,6 +219,8 @@ html.is-phone {
 
   /* 8) Chatbot: gọn, chừa chỗ cho 3 nút ở góc trên */
   .chat-panel {
+    left: auto;
+    top: auto;
     right: 10px;
     bottom: 10px;
     width: min(340px, 52vw);
