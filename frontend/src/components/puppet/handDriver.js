@@ -246,9 +246,18 @@ export class HandDriver {
     const vw = this.video?.videoWidth || 640, vh = this.video?.videoHeight || 480;
     const k = Math.max(c.width / vw, c.height / vh), ox = (c.width - vw * k) / 2, oy = (c.height - vh * k) / 2;
     const P = (p) => ({ x: ox + p.x * vw * k, y: oy + p.y * vh * k });
-    g.lineWidth = 2; g.strokeStyle = "#35e07a"; g.fillStyle = "#ff4d4d";
+    g.save();
+    g.lineCap = "round"; g.lineJoin = "round";
+    // viền tối bên dưới
+    g.lineWidth = 2.7; g.strokeStyle = "#4a3f73";
     for (const [a, b] of SKELETON) { const A = P(this.raw[a]), B = P(this.raw[b]); g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.stroke(); }
-    for (const p of this.raw) { const q = P(p); g.beginPath(); g.arc(q.x, q.y, 2.6, 0, 6.283); g.fill(); }
+    // nét tím Wondera bên trên
+    g.lineWidth = 1.6; g.strokeStyle = "#6e5e9c";
+    for (const [a, b] of SKELETON) { const A = P(this.raw[a]), B = P(this.raw[b]); g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.stroke(); }
+    // khớp cam viền tối
+    g.fillStyle = "#f2a93b"; g.strokeStyle = "#4a3f73"; g.lineWidth = 0.9;
+    for (const p of this.raw) { const q = P(p); g.beginPath(); g.arc(q.x, q.y, 2.3, 0, 6.283); g.fill(); g.stroke(); }
+    g.restore();
   }
 
   /* ---------------------------------------------------------------- */

@@ -20,10 +20,8 @@ const dbg = { ms: 0, n: 0, t: performance.now() };
 // const VISION_WASM_URL =
 //   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm";
 
-const VISION_WASM_URL = new URL(
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
-  import.meta.url
-).href;
+const VISION_WASM_URL =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 
 const GESTURE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
@@ -223,17 +221,21 @@ function detectGesture(timestamp) {
         
         miniCtx.save();
         miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
-        
-        // Vẽ xương tay (Landmarks và Connections)
+        // Vẽ xương tay: đường nối tím (màu nút OPEN PALM), khớp cam (màu nút FIST)
         for (const landmarks of result.landmarks) {
           drawingUtils.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, {
-            color: "#00FF00", // Màu xanh lá cho đường nối
-            lineWidth: 3
+            color: "#4a3f73", // viền tối bên dưới
+            lineWidth: 6
+          });
+          drawingUtils.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, {
+            color: "#6e5e9c", // tím Wondera
+            lineWidth: 3.5
           });
           drawingUtils.drawLandmarks(landmarks, {
-            color: "#FF0000", // Màu đỏ cho các khớp
+            color: "#4a3f73",     // viền khớp
+            fillColor: "#f2a93b", // cam Wondera
             lineWidth: 2,
-            radius: 4
+            radius: 5
           });
         }
         miniCtx.restore();

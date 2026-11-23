@@ -503,9 +503,9 @@ manager.onLoad = function () {
     // Lắng nghe sự kiện khi video chạy đến giây cuối cùng
 
     duckVideo.onended = () => {
-      // 2. VIDEO XONG MỚI HIỆN CHỮ "hé lô nhen"
+      // 2. VIDEO XONG MỚI HIỆN CHỮ "Hellooo thereee!""
 
-      loadingScreenButton.textContent = "hé lô nhen";
+      loadingScreenButton.textContent = "hiii there!";
       loadingScreenButton.style.opacity = "1";
 
       const desktopInstructions = document.querySelector(".desktop-instructions");
@@ -517,7 +517,7 @@ manager.onLoad = function () {
       if (noSoundButton) noSoundButton.style.display = "none";
     
       // 3. Dùng GSAP làm mờ video đi, lúc này màn hình loading
-      // (có chữ hé lô nhen) sẽ lộ ra
+      // (có chữ Hellooo thereee!) sẽ lộ ra
 
       gsap.to(duckOverlay, {
         opacity: 0,
