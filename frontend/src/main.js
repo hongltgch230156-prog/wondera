@@ -16,7 +16,9 @@ import { initAuth, API_BASE } from "./components/auth.js";
 import { createVoiceApi } from "./components/voice.js";
 import { isMobileOrLowEnd, getModelUrl, disposeObject3D } from "./utils/mobile3d.js";
 import "./components/device.js";
+import { initForgeCreditsAlign } from "./components/forgeCreditsAlign.js";
 initAuth();
+initForgeCreditsAlign();
 
 /** -------------------------- Audio setup -------------------------- */
 
