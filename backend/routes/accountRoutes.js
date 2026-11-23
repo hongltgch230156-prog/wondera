@@ -2,7 +2,7 @@
 // Mount SAU `app.use('/api', requireAuth)` để req.user đã có.
 //   GET    /api/account/models | /exports
 //   POST   /api/account/exports          (multipart: image, kind)
-//   PATCH  /api/account/models|exports/:id   { name }
+//   PATCH  /api/account/models|exports/:id   { name }  hoặc multipart (name?, thumb) -> đổi tên và/hoặc ảnh thumbnail (chỉ models)
 //   DELETE /api/account/models|exports/:id
 //   PUT    /api/account/game/snap-solve  { completed, best }  -> { snapSolve }  (tiến độ game theo tài khoản)
 const express = require('express');
@@ -25,7 +25,16 @@ const upload = multer({
   limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
 });
 
-// Express 5 không còn hỗ trợ regex trong tham số (":type(models|exports)"),
+// PATCH có thể là JSON (chỉ đổi tên) hoặc multipart (kèm ảnh thumbnail mới). multer bỏ qua request JSON.
+const handleThumbUpload = (req, res, next) =>
+  upload.single('thumb')(req, res, (err) => {
+    if (!err) return next();
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    res.status(tooBig ? 413 : 400).json({
+      error: tooBig ? 'Image is too large (maximum 12MB).' : 'Failed to read uploaded image.',
+    });
+  });
+// Express 5 không còn hỗ trợ regex trong route path, nên phải đăng ký route riêng cho từng loại.
 // nên đăng ký route riêng cho từng loại.
 const SEGMENTS = { models: 'model', exports: 'export' };
 
@@ -72,18 +81,48 @@ for (const [segment, type] of Object.entries(SEGMENTS)) {
   });
 
   /* ------------------------------ Đổi tên ------------------------------ */
-  router.patch(`/${segment}/:id`, async (req, res) => {
+  router.patch(`/${segment}/:id`, handleThumbUpload, async (req, res) => {
+    let newThumb = null; // file thumbnail vừa upload, để dọn nếu lưu DB thất bại
     try {
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Item not found.' });
-      const name = String(req.body?.name ?? '').trim().slice(0, 60);
-      if (!name) return res.status(400).json({ error: 'Name cannot be empty.' });
       const doc = await Creation.findOne({ _id: req.params.id, user: req.user._id, type, status: 'ready' });
       if (!doc) return res.status(404).json({ error: 'Item not found.' });
-      doc.name = name;
+
+      // tên (không bắt buộc nếu chỉ đổi ảnh)
+      const hasName = req.body?.name !== undefined;
+      if (hasName) {
+        const name = String(req.body.name).trim().slice(0, 60);
+        if (!name) return res.status(400).json({ error: 'Name cannot be empty.' });
+        doc.name = name;
+      }
+
+      // ảnh thumbnail mới (chỉ áp dụng cho model 3D)
+      let oldThumb = '';
+      if (req.file) {
+        if (type !== 'model') return res.status(400).json({ error: 'Only 3D models can have a custom image.' });
+        let meta;
+        try {
+          meta = await sharp(req.file.buffer).metadata(); // không tin mimetype do client gửi
+        } catch {
+          return res.status(400).json({ error: 'File is not a valid image.' });
+        }
+        if (!['png', 'jpeg', 'webp'].includes(meta.format)) {
+          return res.status(400).json({ error: 'Only PNG, JPG, and WebP images are supported.' });
+        }
+        newThumb = await storage.saveThumb(req.file.buffer); // lên Supabase (thumbs/) như lúc tạo model
+        oldThumb = doc.thumb;
+        doc.thumb = newThumb;
+      } else if (!hasName) {
+        return res.status(400).json({ error: 'Nothing to update.' });
+      }
+
       await doc.save();
+      newThumb = null; // đã lưu DB thành công
+      if (oldThumb) await storage.removeFiles(oldThumb); // xóa ảnh cũ trên Supabase cho gọn kho
       res.json({ item: toJson(doc) });
     } catch (err) {
-      serverError(res, `rename-${segment}`, err);
+      if (newThumb) await storage.removeFiles(newThumb).catch(() => {});
+      serverError(res, `update-${segment}`, err);
     }
   });
 

@@ -38,6 +38,7 @@ const IC = {
   close: stroke(`<path d="M6 6l12 12M18 6 6 18"/>`),
   edit: stroke(`<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>`),
   check: stroke(`<path d="m5 12.5 4.5 4.5L19 7.5"/>`),
+  camera: stroke(`<path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/>`),
   eye: stroke(`<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`),
   trash: stroke(`<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/>`),
   cube: stroke(`<path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7z"/><path d="M3.5 7 12 11.5 20.5 7M12 11.5v10"/>`),
@@ -93,6 +94,28 @@ function readGameProgress() {
   const p = readProgress();
   if (DEMO && !p.completed.length) return { completed: [1, 2, 3], best: { 1: 41.2, 2: 78.9, 3: 95.4 } };
   return p;
+}
+
+// Thu nhỏ ảnh người dùng chọn (tối đa 900px, JPEG) trước khi gửi -> upload nhanh, nhẹ cho điện thoại.
+// Trình duyệt không đọc được định dạng đó thì gửi nguyên file gốc, để server kiểm tra.
+async function makeThumbBlob(file, max = 900) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * s));
+    const h = Math.max(1, Math.round(bmp.height * s));
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff";            // ảnh PNG trong suốt -> nền trắng
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    if (bmp.close) bmp.close();
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88));
+    if (blob) return blob;
+  } catch { /* dùng file gốc */ }
+  return file;
 }
 
 const fmtTime = (secs) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
@@ -223,6 +246,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     editingProfile: false,
     renamingId: null,
     confirmId: null,
+    pendingThumb: null,        // { id, blob, url }: ảnh mới đã chọn nhưng chưa bấm lưu
   };
   let confirmTimer = 0;
   let toastTimer = 0;
@@ -289,10 +313,12 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
 
   /* ---------- gọi API ---------- */
   async function api(path, opts = {}) {
+    // Gửi FormData (đổi ảnh) thì để trình duyệt tự đặt Content-Type (có boundary)
+    const isForm = typeof FormData !== "undefined" && opts.body instanceof FormData;
     const res = await fetch(`${apiBase}${path}`, {
       ...opts,
       headers: {
-        "Content-Type": "application/json",
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         Authorization: `Bearer ${getToken() || ""}`,
         ...(opts.headers || {}),
       },
@@ -423,20 +449,31 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     }
     elGrid.className = "account-grid";
     elGrid.innerHTML = list.map((it) => {
-      const thumb = asset(it.thumbnail || it.thumbnailUrl || it.image) || placeholderThumb(it.id || it.name, state.tab);
       const renaming = state.renamingId === it.id;
+      const pend = renaming && state.pendingThumb && state.pendingThumb.id === it.id ? state.pendingThumb : null;
+      const thumb = pend
+        ? pend.url
+        : asset(it.thumbnail || it.thumbnailUrl || it.image) || placeholderThumb(it.id || it.name, state.tab);
+      const canChangeThumb = renaming && state.tab === "models";   // chỉ model 3D mới đổi được ảnh
       const confirming = state.confirmId === it.id;
       const title = renaming
         ? `<input class="account-rename-input" type="text" maxlength="60" value="${esc(it.name)}" aria-label="Name">`
         : `<h3 class="account-item-name" title="${esc(it.name)}">${esc(it.name || "Untitled")}</h3>`;
       return `
-        <article class="account-item" data-id="${esc(it.id)}">
-          <div class="account-thumb"><img src="${esc(thumb)}" alt="" loading="lazy"></div>
+        <article class="account-item${renaming ? " is-editing" : ""}" data-id="${esc(it.id)}">
+          <div class="account-thumb${canChangeThumb ? " is-editable" : ""}${pend ? " has-new" : ""}">
+            <img src="${esc(thumb)}" alt="" loading="lazy">
+            ${canChangeThumb
+              ? `<button type="button" class="account-thumb-change" data-act="change-thumb" aria-label="Change image" title="Choose a new image">${IC.camera}<span>${pend ? "Change again" : "Change image"}</span></button>`
+              : ""}
+          </div>
           ${title}
           <p class="account-item-date">${esc(fmtDate(it.createdAt || it.created_at))}</p>
           <div class="account-item-actions">
             <button type="button" data-act="view" aria-label="View" title="View">${IC.eye}</button>
-            <button type="button" data-act="rename" aria-label="Rename" title="Rename">${renaming ? IC.check : IC.edit}</button>
+            <button type="button" data-act="rename" aria-label="${renaming ? "Save" : "Edit"}" title="${renaming ? "Save" : "Edit"}">
+              ${renaming ? IC.check : IC.edit}
+            </button>
             <button type="button" data-act="delete" class="${confirming ? "is-confirm" : ""}" aria-label="Delete"
                     title="${confirming ? "Click again to delete" : "Delete"}">${confirming ? "<span>Sure?</span>" : IC.trash}</button>
           </div>
@@ -545,20 +582,76 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
 
   const itemById = (id) => (state.lists[state.tab] || []).find((x) => String(x.id) === String(id));
 
+  // bỏ ảnh đang chọn dở (keepUrl = true: giữ blob URL vì ảnh đang được dùng làm thumbnail ở chế độ demo)
+  function clearPending(keepUrl = false) {
+    if (state.pendingThumb && !keepUrl) URL.revokeObjectURL(state.pendingThumb.url);
+    state.pendingThumb = null;
+  }
+  let saving = false;
   async function saveRename(id) {
+    if (saving) return;
     const input = elGrid.querySelector(".account-rename-input");
     const item = itemById(id);
-    const name = input ? input.value.trim() : "";
-    if (!item || !name || name === item.name) { state.renamingId = null; return renderGrid(); }
+    if (!item) { clearPending(); state.renamingId = null; return renderGrid(); }
+    const name = (input ? input.value.trim() : "") || item.name;   // để trống tên -> giữ tên cũ
+    const pend = state.pendingThumb && state.pendingThumb.id === id ? state.pendingThumb : null;
+    if (name === item.name && !pend) { clearPending(); state.renamingId = null; return renderGrid(); }
+    const card = elGrid.querySelector(`.account-item[data-id="${CSS.escape(String(id))}"]`);
+    saving = true;
+    card?.classList.add("is-saving");
     try {
-      if (!DEMO) await api(`/api/account/${state.tab}/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      let data = null;
+      if (!DEMO) {
+        let body;
+        if (pend) {
+          body = new FormData();
+          if (name !== item.name) body.append("name", name);
+          body.append("thumb", pend.blob, "thumb.jpg");
+        } else {
+          body = JSON.stringify({ name });
+        }
+        data = await api(`/api/account/${state.tab}/${encodeURIComponent(id)}`, { method: "PATCH", body });
+      }
       item.name = name;
+      if (pend) {
+        item.thumbnail = DEMO ? pend.url : data?.item?.thumbnail || item.thumbnail;
+        clearPending(DEMO);
+        toast("Image updated ✨");
+      }
       state.renamingId = null;
       renderGrid();
     } catch (err) {
+      card?.classList.remove("is-saving");
       toast(err.message, true);
+    } finally {
+      saving = false;
     }
   }
+  /* ---------- đổi ảnh thumbnail (chỉ hiện khi đang sửa một model 3D) ---------- */
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/png,image/jpeg,image/webp";
+  fileInput.hidden = true;
+  root.appendChild(fileInput);
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileInput.value = "";                     // cho phép chọn lại đúng file đó lần sau
+    const id = state.renamingId;
+    if (!file || !id) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return toast("Please choose a PNG, JPG or WebP image.", true);
+    if (file.size > 12 * 1024 * 1024) return toast("Image is too large (maximum 12MB).", true);
+    const blob = await makeThumbBlob(file);
+    if (state.renamingId !== id) return;      // trong lúc xử lý, user đã thoát chế độ sửa
+    clearPending();
+    state.pendingThumb = { id, blob, url: URL.createObjectURL(blob) };
+    // cập nhật thẳng vào DOM (không vẽ lại cả lưới) để tên đang gõ dở không bị mất
+    const card = elGrid.querySelector(`.account-item[data-id="${CSS.escape(String(id))}"]`);
+    const img = card?.querySelector(".account-thumb img");
+    if (img) img.src = state.pendingThumb.url;
+    card?.querySelector(".account-thumb")?.classList.add("has-new");
+    const label = card?.querySelector(".account-thumb-change span");
+    if (label) label.textContent = "Change again";
+  });
 
   async function deleteItem(id) {
     try {
@@ -662,6 +755,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
 
   tabs.forEach((t) => t.addEventListener("click", () => {
     state.tab = t.dataset.tab;
+    clearPending();
     state.renamingId = state.confirmId = null;
     renderTabs();
     renderGrid();
@@ -684,13 +778,15 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     const item = itemById(id);
     if (!item) return;
     if (b.dataset.act === "view") viewItem(item);
+    else if (b.dataset.act === "change-thumb") fileInput.click();
     else if (b.dataset.act === "rename") {
       if (state.renamingId === id) saveRename(id);
-      else { state.renamingId = id; state.confirmId = null; renderGrid(); }
+      else { clearPending(); state.renamingId = id; state.confirmId = null; renderGrid(); }
     } else if (b.dataset.act === "delete") {
       if (state.confirmId === id) { clearTimeout(confirmTimer); deleteItem(id); }
       else {
         state.confirmId = id;
+        clearPending();
         state.renamingId = null;
         renderGrid();
         clearTimeout(confirmTimer);
@@ -701,7 +797,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
   elGrid.addEventListener("keydown", (e) => {
     if (!e.target.classList.contains("account-rename-input")) return;
     if (e.key === "Enter") { e.preventDefault(); saveRename(state.renamingId); }
-    else if (e.key === "Escape") { e.stopPropagation(); state.renamingId = null; renderGrid(); }
+    else if (e.key === "Escape") { e.stopPropagation(); clearPending(); state.renamingId = null; renderGrid(); }
   });
 
   /* ---------- mở / đóng ---------- */
@@ -710,6 +806,7 @@ export function mountAccountButton({ user, apiBase = "", getToken = () => null, 
     if (root.classList.contains("is-open")) return;
     lastFocus = document.activeElement;
     state.editingProfile = false;
+    clearPending();
     state.renamingId = state.confirmId = null;
     root.classList.remove("is-closing");
     root.classList.add("is-open");
