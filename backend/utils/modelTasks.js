@@ -54,7 +54,7 @@ async function trackModelTask(userId, taskId, { kind, name, thumbBuffer, thumbUr
         thumb = await storage.saveThumb(await storage.fetchBuffer(thumbUrl, MAX_THUMB_SOURCE_BYTES));
       }
     } catch (e) {
-      console.warn('[Account] Không tạo được thumbnail:', e.message);
+      console.warn('[Account] Không tạo được thumbnail:', e.stack || e.message);
     }
     await Creation.create({
       user: userId,
