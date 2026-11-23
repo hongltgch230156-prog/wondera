@@ -234,31 +234,32 @@ html.is-phone {
   #close-chat, #choose-buddy, #close-picker { width: 30px; height: 30px; flex-basis: 30px; border-radius: 9px; }
   .msg-bubble { font-size: 13px; padding: 7px 10px; }
   .chat-form { padding: 6px 8px; gap: 6px; }
-  /* Khung chọn mascot: nằm sát đáy, cùng chiều cao và cùng mép dưới với khung chat bên phải */
+
+  /* Khung chọn mascot: chỉ cao vừa nội dung, cùng mép dưới với khung chat */
   .character-picker:not([hidden]) {          // :not([hidden]) để không làm lộ khung khi nó đang ẩn
     display: flex;
     flex-direction: column;
     top: auto;
     right: auto;
     left: 10px;
-    bottom: 10px;
+    bottom: 10px;                            // = bottom của .chat-panel, nên hai mép dưới thẳng hàng
     transform: none;
     width: calc(100vw - min(340px, 52vw) - 30px);   // phần còn lại bên trái khung chat
     min-width: 0;
     max-width: 400px;
-    height: calc(100dvh - 74px);                    // bằng chiều cao khung chat
-    padding: 12px 12px 10px;
+    height: auto;                            // không còn ép bằng chiều cao khung chat
+    max-height: calc(100dvh - 74px);
+    padding: 10px 12px 12px;
     border-radius: 16px;
   }
   .character-picker .panel-header h2 { font-size: 14px; }
   .character-picker .panel-header p { margin-top: 1px; font-size: 11px; }
-  .picker-carousel { flex: 1 1 auto; align-items: center; gap: 6px; margin-top: 0; min-height: 0; }  // thẻ mascot căn giữa theo chiều dọc
+  .picker-carousel { flex: 0 0 auto; align-items: center; gap: 6px; margin-top: 2px; }
   .scroll-btn { width: 28px; height: 28px; flex: 0 0 28px; }
-  .character-list { max-width: none; gap: 8px; padding: 10px 4px; }
+  .character-list { max-width: none; gap: 8px; padding: 10px 4px 2px; }
   .character-card { width: 66px; flex: 0 0 66px; }
   .char-name { margin-top: 4px; font-size: 12px; }
   .char-mood { margin-top: 2px; font-size: 9px; }
-
 
     /* 9) Đăng nhập: giống bản laptop – card bên trái, cảnh 3D + mascot bên phải */
   .auth-layout {

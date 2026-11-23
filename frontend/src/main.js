@@ -505,7 +505,7 @@ manager.onLoad = function () {
     duckVideo.onended = () => {
       // 2. VIDEO XONG MỚI HIỆN CHỮ "Hellooo thereee!""
 
-      loadingScreenButton.textContent = "hiii there!";
+      loadingScreenButton.textContent = "Hiii there!";
       loadingScreenButton.style.opacity = "1";
 
       const desktopInstructions = document.querySelector(".desktop-instructions");
