@@ -1349,6 +1349,7 @@ html:not(.is-phone) .forge-output-panel div.forge-magic-credits {
   .forge-magic-credits-label { font-size: 0.88rem; }
   .forge-magic-credits-track { height: 7px; }
 }
-@media (max-width: 900px) {
-  html:not(.is-phone) .forge-output-panel div.forge-magic-credits { width: 170px; }
+// Màn hình thấp (tablet, laptop nhỏ): hàng tiêu đề thấp hơn, đưa thẻ credits lên cao để không đè card RESULT
+@media (max-height: 850px) {
+  html:not(.is-phone) .forge-output-panel div.forge-magic-credits { top: 14px; }
 }
