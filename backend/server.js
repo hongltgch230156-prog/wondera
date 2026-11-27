@@ -25,10 +25,7 @@ const gemini = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB đã kết nối'))
-  .catch((err) => { console.error('Lỗi kết nối MongoDB:', err.message); process.exit(1); });
+// (kết nối MongoDB + listen đã được chuyển xuống cuối file, chỉ chạy khi chạy trực tiếp `node server.js`)
 
 const app = express();
 app.set('trust proxy', 1);
@@ -41,6 +38,7 @@ app.use('/webhooks', paymentWebhooks);
 
 //app.use(express.json());
 app.use(express.json({ limit: '50mb' }));
+app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); });
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use('/files', storage.filesMiddleware);
@@ -973,5 +971,15 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend Server đang chạy tại http://localhost:${PORT}`));
+// Xuất app để test (supertest) import được mà KHÔNG mở cổng và KHÔNG kết nối Mongo thật
+module.exports = app;
+
+if (require.main === module) {
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => console.log('MongoDB đã kết nối'))
+    .catch((err) => { console.error('Lỗi kết nối MongoDB:', err.message); process.exit(1); });
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Backend Server đang chạy tại http://localhost:${PORT}`));
+}

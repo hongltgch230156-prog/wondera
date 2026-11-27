@@ -48,7 +48,13 @@ Open: click the "3D FORGE" sign. Left side = inputs, right side = result viewer.
    - "Multiple objects": turns a whole scene (a room, a landscape, several items) into a 3D diorama block. Use the generate-scene button after uploading the image (costs 1 credit).
 2) Source image: upload a picture (PNG/JPG). The image is required.
 3) Magic Wand (inside Multiple objects): lets the user pick objects from the picture and turn them into separate 3D models. Steps: choose Magic Wand, click an object in the image (the text box "Describe & select object" can describe it, e.g. "the red chair in the middle - keep its wooden legs"), wait for the object to be cut out (picking objects is free), then press "3D Creation" to build the 3D model from the picked objects. After the 3D models are created, the user can rotate, move and scale EACH 3D model separately inside the 3D viewer (click a model to select it, then use the on-screen transform tools).
-   Credits: every 3D model generation costs ${CREDITS_PER_3D_MODEL} credit (see CREDITS AND PAYMENT
+   Credits: every 3D model generation costs ${CREDITS_PER_3D_MODEL} credit (see CREDITS AND PAYMENT below).
+TIPS FOR GOOD RESULTS
+- Single object works best with one clear item in the picture, with the whole object visible.
+- Use a sharp, well-lit PNG or JPG; the background is removed automatically for Single object.
+- Multiple objects is for whole scenes; to get separate models, use Magic Wand and pick objects one by one.
+
+CREDITS AND PAYMENT
 - Creating (generating) a 3D model costs ${CREDITS_PER_3D_MODEL} credit each time, in Single object mode and in Multiple objects mode (including the "3D Creation" step after picking objects with Magic Wand).
 - Everything else is FREE and does not use credits: picking objects with Magic Wand, moving/rotating/scaling models, exporting 3D files, creating 2D images (Direct Render and AI Style Reconstruction), Hand Lab (Puppet Stage, Meme Search, Snap & Solve), Magic Tree, and viewing the Account page.
 - Every new account starts with ${FREE_CREDITS} free credits. The balance is shown in the Forge card ("N credits left") and in Account > Credits. Credits never expire.

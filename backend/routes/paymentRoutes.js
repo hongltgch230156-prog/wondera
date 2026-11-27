@@ -23,10 +23,12 @@ const orderJson = (o) => ({
 
 router.get('/wallet', async (req, res) => {
   try {
-    const [balance, history] = await Promise.all([
-      credits.getBalance(req.user._id),
-      credits.history(req.user._id, 20),
-    ]);
+    // const [balance, history] = await Promise.all([
+    //   credits.getBalance(req.user._id),
+    //   credits.history(req.user._id, 20),
+    // ]);
+    const balance = await credits.getBalance(req.user._id);
+    const history = await credits.history(req.user._id, 20);
     res.json({
       credits: balance,
       freeCredits: FREE_CREDITS,
